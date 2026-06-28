@@ -685,6 +685,15 @@
   $("savePlansBtn").onclick = () => savePlans().catch((e) => A.toast(e.message, "error"));
   $("saveNewPlanBtn").onclick = () => saveNewPlan().catch((e)=>A.toast(e.message,"error"));
 
+  const requiredCreditFunctionIds = new Set([
+    "activator11.generate",
+    "activator16.generate",
+    "config.access",
+    "config.generate_codes",
+  ]);
+  function isRequiredCreditFunction(f) {
+    return requiredCreditFunctionIds.has(String(f?.id || ""));
+  }
   function isDownloadCreditFunction(f) {
     return [
       "config.generate_codes",
@@ -703,14 +712,17 @@
       return ad-bd || Number(a.sort_order||0)-Number(b.sort_order||0) || String(a.name||"").localeCompare(String(b.name||""),"pt-BR");
     });
     $("creditRules").innerHTML = ordered.map((f)=>{
-      const mode=["free","credits","disabled"].includes(f.credit_mode)?f.credit_mode:"free";
-      const tag=isDownloadCreditFunction(f)?'<span class="badge blocked" style="margin-left:6px">Código de download</span>':'';
-      return `<div class="credit-rule"><div><b>${esc(f.name)}</b>${tag}<small>${esc(f.group_name)} • ${esc(f.action_kind||"ação")}</small></div><select data-credit-mode="${esc(f.id)}"><option value="disabled" ${mode==="disabled"?"selected":""}>Desativado para clientes por créditos</option><option value="free" ${mode==="free"?"selected":""}>Ativado — grátis</option><option value="credits" ${mode==="credits"?"selected":""}>Ativado — consome créditos</option></select><input data-credit-cost="${esc(f.id)}" type="number" min="0" step="1" value="${Number(f.credit_cost||0)}" ${mode==="credits"?"":"disabled"}></div>`;
+      const required=isRequiredCreditFunction(f);
+      const storedMode=["free","credits","disabled"].includes(f.credit_mode)?f.credit_mode:"free";
+      const mode=required?"credits":storedMode;
+      const cost=mode==="credits"?Math.max(1,Number(f.credit_cost)||1):0;
+      const tags=[isDownloadCreditFunction(f)?'<span class="badge blocked" style="margin-left:6px">Código de download</span>':'',required?'<span class="badge" style="margin-left:6px">Cobrança definida</span>':''].join("");
+      return `<div class="credit-rule"><div><b>${esc(f.name)}</b>${tags}<small>${esc(f.group_name)} • ${esc(f.action_kind||"ação")}</small></div><select data-credit-mode="${esc(f.id)}" ${required?"disabled":""}><option value="disabled" ${mode==="disabled"?"selected":""}>Desativado para clientes por créditos</option><option value="free" ${mode==="free"?"selected":""}>Ativado — grátis</option><option value="credits" ${mode==="credits"?"selected":""}>Ativado — consome créditos</option></select><input data-credit-cost="${esc(f.id)}" type="number" min="1" step="1" value="${cost}" ${mode==="credits"?"":"disabled"}></div>`;
     }).join("");
     document.querySelectorAll("[data-credit-mode]").forEach((sel)=>sel.onchange=()=>{ const input=document.querySelector(`[data-credit-cost="${CSS.escape(sel.dataset.creditMode)}"]`); input.disabled=sel.value!=="credits"; if(sel.value!=="credits") input.value=0; else if(Number(input.value)<1) input.value=1; });
   }
   async function saveCreditRules() {
-    const rows=state.functions.map((f)=>{ const mode=document.querySelector(`[data-credit-mode="${CSS.escape(f.id)}"]`)?.value||"free"; const cost=mode==="credits"?Math.max(1,Number(document.querySelector(`[data-credit-cost="${CSS.escape(f.id)}"]`)?.value)||1):0; return {id:f.id,credit_mode:mode,credit_cost:cost}; });
+    const rows=state.functions.map((f)=>{ const required=isRequiredCreditFunction(f); const mode=required?"credits":(document.querySelector(`[data-credit-mode="${CSS.escape(f.id)}"]`)?.value||"free"); const cost=mode==="credits"?Math.max(1,Number(document.querySelector(`[data-credit-cost="${CSS.escape(f.id)}"]`)?.value)||1):0; return {id:f.id,credit_mode:mode,credit_cost:cost}; });
     const results=await Promise.all(rows.map((r)=>A.client.from("functions_catalog").update({credit_mode:r.credit_mode,credit_cost:r.credit_cost,updated_at:new Date().toISOString()}).eq("id",r.id)));
     const failed=results.find((r)=>r.error); if(failed?.error) throw failed.error;
     state.functions=state.functions.map((f)=>{const r=rows.find((x)=>x.id===f.id);return {...f,...r};});

@@ -325,17 +325,34 @@
     "package.eaigo.access": { order: 120, group: "EAIGO", label: "Acesse Aqui EAIGO", icon: "↗" },
   });
 
+  // Estas quatro ações foram definidas pelo administrador como cobradas em
+  // qualquer conta do tipo créditos. O valor continua vindo do Supabase; se a
+  // regra antiga estiver como grátis ou sem custo, usa 1 crédito até o ADM
+  // salvar novamente a Central de Créditos.
+  const REQUIRED_CREDIT_ACTIONS = new Set([
+    "activator11.generate",
+    "activator16.generate",
+    "config.access",
+    "config.generate_codes",
+  ]);
+
   function creditActionDefinition(functionId) {
     return CREDIT_CHARGE_ACTIONS[String(functionId || "")] || null;
   }
 
+  function effectiveCreditCost(f) {
+    if (!f || !creditActionDefinition(f.id)) return 0;
+    const mode = String(f.credit_mode || "").toLowerCase();
+    if (mode === "disabled") return 0;
+    const configured = Number(f.credit_cost || 0);
+    if (REQUIRED_CREDIT_ACTIONS.has(String(f.id || ""))) {
+      return Math.max(1, Number.isFinite(configured) ? configured : 1);
+    }
+    return mode === "credits" && configured > 0 ? Math.max(1, configured) : 0;
+  }
+
   function isCreditChargeAction(f) {
-    return Boolean(
-      f &&
-      creditActionDefinition(f.id) &&
-      String(f.credit_mode || "").toLowerCase() === "credits" &&
-      Number(f.credit_cost || 0) > 0
-    );
+    return effectiveCreditCost(f) > 0;
   }
 
   function previewStorageKey(token) {
@@ -693,6 +710,10 @@
     button.dataset.jcServerActivationBound = "1";
     button.removeAttribute("onclick");
     button.addEventListener("click", function (event) {
+      const functionId = type === "11" ? "activator11.generate" : "activator16.generate";
+      // Em manutenção, deixa o evento seguir para o runtime original, que exibe
+      // a mensagem configurada pelo administrador e não gera código.
+      if (window.JC_PANEL_RUNTIME?.isMaintenance?.(functionId)) return;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
@@ -701,13 +722,17 @@
     }, true);
   }
   function installServerActivationGenerators() {
-    // A geração real continua nesta camada autenticada. O clique é tratado
-    // somente pelo runtime unificado (panel-runtime.js).
+    // Mantém a API usada pelo runtime e também vincula diretamente os dois
+    // botões. O controle de permissões/créditos continua sendo executado antes,
+    // no capture do documento; após a confirmação, o clique repetido chega
+    // exatamente uma vez ao gerador real.
     window.JC_ACTIVATION_CODES = {
       generate: createServerActivationCode,
       mode: () => state.mode,
       profile: () => state.profile,
     };
+    bindServerActivationButton("11");
+    bindServerActivationButton("16");
   }
   function completeGrant() {
     store();
@@ -1077,17 +1102,18 @@
     const byId=new Map((state.functions||[]).map((f)=>[String(f.id||""),f]));
     return Object.entries(CREDIT_CHARGE_ACTIONS).map(([id,meta])=>{
       const f=byId.get(id);if(!f||!allowed(f)||!isCreditChargeAction(f))return null;
-      return {f,meta,cost:Math.max(1,Number(f.credit_cost)||1)};
+      return {f,meta,cost:effectiveCreditCost(f)};
     }).filter(Boolean).sort((a,b)=>a.meta.order-b.meta.order);
   }
   function renderCreditCenter(){
-    if(accountType()!=="credits"||state.mode==="admin"||state.mode==="test"||state.mode==="preview")return;
+    if(accountType()!=="credits"||state.mode==="admin"||state.mode==="test")return;
     injectCreditCenterStyles();
     let center=$("jc_credit_center");
     if(!center){center=document.createElement("section");center.id="jc_credit_center";center.className="jc-credit-center";const header=document.querySelector(".wrapper .header")||document.querySelector(".header");if(header)header.insertAdjacentElement("afterend",center);else(document.querySelector(".wrapper")||document.body).prepend(center);}
     const rows=creditFunctionsForPanel();
     const actions=rows.length?rows.map(({meta,cost})=>`<div class="jc-credit-action"><span class="jc-credit-action-icon">${escapeHtml(meta.icon)}</span><span><b>${escapeHtml(meta.label)}</b><small>${escapeHtml(meta.group)}</small></span><span class="jc-credit-cost">${cost} crédito${cost>1?"s":""}</span></div>`).join(""):`<div class="jc-credit-action" style="grid-column:1/-1"><span class="jc-credit-action-icon">✓</span><span><b>Nenhuma ação com cobrança configurada</b><small>As funções liberadas estão gratuitas neste momento.</small></span></div>`;
-    center.innerHTML=`<div class="jc-credit-head"><div class="jc-credit-title"><span class="jc-credit-title-icon">💳</span><div><span class="jc-credit-eyebrow">Central de créditos</span><h2>Seu saldo e as cobranças do painel</h2><p>Você sempre confirma antes de qualquer desconto.</p></div></div><div class="jc-credit-balance-card"><strong data-jc-credit-value>${Number(state.profile?.credits_balance||0)}</strong><span>créditos disponíveis</span></div></div><div class="jc-credit-actions">${actions}</div><div class="jc-credit-note"><span>ℹ️</span><span><b>Não consomem créditos:</b> abrir menus, visualizar telas, copiar códigos, consultar versões, fechar ou resetar a visualização. Somente as ações listadas acima podem descontar saldo.</span></div>`;
+    const isPreview=state.mode==="preview";
+    center.innerHTML=`<div class="jc-credit-head"><div class="jc-credit-title"><span class="jc-credit-title-icon">💳</span><div><span class="jc-credit-eyebrow">${isPreview?"Pré-visualização dos créditos":"Central de créditos"}</span><h2>${isPreview?"Como os créditos funcionarão nesta conta":"Seu saldo e as cobranças do painel"}</h2><p>${isPreview?"A prévia apenas demonstra os custos; nenhum crédito ou arquivo real é utilizado.":"Você sempre confirma antes de qualquer desconto."}</p></div></div><div class="jc-credit-balance-card"><strong data-jc-credit-value>${Number(state.profile?.credits_balance||0)}</strong><span>créditos disponíveis</span></div></div><div class="jc-credit-actions">${actions}</div><div class="jc-credit-note"><span>ℹ️</span><span><b>Não consomem créditos:</b> abrir menus, visualizar telas, copiar códigos, consultar versões, fechar ou resetar a visualização. ${isPreview?"Ao clicar nas ações cobradas, será mostrada somente uma simulação do desconto.":"Somente as ações listadas acima podem descontar saldo."}</span></div>`;
   }
   function closeReservedCreditWindow(el){
     const popup=el?._jcCreditWindow;delete el?._jcCreditWindow;
@@ -1098,7 +1124,7 @@
     return new Promise((resolve)=>{
       let modal=$("jc_credit_confirm");
       if(!modal){modal=document.createElement("div");modal.id="jc_credit_confirm";modal.className="jc-credit-confirm";modal.innerHTML=`<div class="jc-credit-confirm-box" role="dialog" aria-modal="true"><h3>Confirmar uso de créditos</h3><p id="jc_credit_confirm_name"></p><div class="jc-credit-summary"><div><span>Custo da ação</span><b id="jc_credit_confirm_cost"></b></div><div><span>Saldo atual</span><b id="jc_credit_confirm_balance"></b></div><div class="after"><span>Saldo após confirmar</span><b id="jc_credit_confirm_after"></b></div></div><div class="jc-credit-confirm-actions"><button type="button" class="jc-credit-cancel" id="jc_credit_confirm_cancel">Cancelar</button><button type="button" class="jc-credit-accept" id="jc_credit_confirm_accept">Confirmar e continuar</button></div></div>`;document.body.appendChild(modal);}
-      const finish=(confirmed)=>{modal.classList.remove("show");modal.setAttribute("aria-hidden","true");let popup=null;if(confirmed&&String(f.action_kind||"")==="link"){try{popup=window.open("about:blank","_blank");if(popup){popup.document.title="JC-APK TV — preparando acesso";popup.document.body.innerHTML='<p style="font-family:Arial;padding:24px">Preparando seu acesso...</p>';}}catch(_){popup=null;}}resolve({confirmed,popup});};
+      const finish=(confirmed)=>{modal.classList.remove("show");modal.setAttribute("aria-hidden","true");let popup=null;if(confirmed&&String(f.action_kind||"")==="link"&&String(f.id||"")!=="config.access"){try{popup=window.open("about:blank","_blank");if(popup){popup.document.title="JC-APK TV — preparando acesso";popup.document.body.innerHTML='<p style="font-family:Arial;padding:24px">Preparando seu acesso...</p>';}}catch(_){popup=null;}}resolve({confirmed,popup});};
       $("jc_credit_confirm_name").textContent=(creditActionDefinition(f.id)?.label||f.name||"Esta função")+".";
       $("jc_credit_confirm_cost").textContent=cost+" crédito"+(cost>1?"s":"");
       $("jc_credit_confirm_balance").textContent=balance+" crédito"+(balance!==1?"s":"");
@@ -1112,7 +1138,7 @@
   async function consumeCreditAndReplay(el,f){
     if(state.creditPending.has(el))return;state.creditPending.add(el);
     try{
-      const cost=Math.max(1,Number(f.credit_cost)||1);const balance=Number(state.profile.credits_balance||0);
+      const cost=effectiveCreditCost(f);const balance=Number(state.profile.credits_balance||0);
       if(balance<cost){demoDialog({name:"Créditos insuficientes"});$("jc_demo_text").textContent=`Seus créditos acabaram ou são insuficientes. Saldo atual: ${balance}. As funções gratuitas continuam disponíveis. Entre em contato para comprar mais.`;return;}
       const confirmation=await confirmCreditUse(f,cost,balance);if(!confirmation.confirmed)return;if(confirmation.popup)el._jcCreditWindow=confirmation.popup;
       const operationId=crypto.randomUUID?crypto.randomUUID():"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,(c)=>{const r=Math.random()*16|0,v=c==="x"?r:(r&3|8);return v.toString(16);});
@@ -1140,6 +1166,26 @@
         return;
       }
       e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();blockedDialog(f);return;
+    }
+    if(state.mode==="preview") {
+      // A pré-visualização administrativa nunca executa códigos, links ou downloads reais.
+      // Botões de entrada continuam abrindo apenas os respectivos menus visuais.
+      if(f.action_kind==="entry") return;
+      e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+      if(accountType()==="credits"&&isCreditChargeAction(f)){
+        const cost=effectiveCreditCost(f);
+        const balance=Number(state.profile?.credits_balance||0);
+        demoDialog({name:creditActionDefinition(f.id)?.label||f.name,purchase_enabled:false,purchase_price:0});
+        $("jc_demo_title").textContent=(creditActionDefinition(f.id)?.label||f.name)+" — consome "+cost+" crédito"+(cost>1?"s":"");
+        $("jc_demo_text").textContent="Na conta real, esta ação pedirá confirmação antes do desconto. Saldo atual: "+balance+". Saldo depois: "+Math.max(0,balance-cost)+". Nesta pré-visualização nenhum crédito foi descontado e nenhum download, código ou link real foi liberado.";
+        const buy=$("jc_demo_buy");if(buy)buy.style.display="none";
+      }else if(f.action_kind==="link" || f.action_kind==="download"){
+        showDemoServer(f);
+      }else{
+        demoDialog(f,false);
+        $("jc_demo_text").textContent="Pré-visualização segura: esta ação foi apenas simulada. Nenhum código válido foi gerado e nenhum dado real foi entregue.";
+      }
+      return;
     }
     if(state.mode==="test") {
       // Geradores usam a demonstração existente; links e downloads nunca abrem o endereço real.

@@ -704,35 +704,15 @@
       setActivationButtonBusy(type, false);
     }
   }
-  function bindServerActivationButton(type) {
-    const button = activationButton(type);
-    if (!button || button.dataset.jcServerActivationBound === "1") return;
-    button.dataset.jcServerActivationBound = "1";
-    button.removeAttribute("onclick");
-    button.addEventListener("click", function (event) {
-      const functionId = type === "11" ? "activator11.generate" : "activator16.generate";
-      // Em manutenção, deixa o evento seguir para o runtime original, que exibe
-      // a mensagem configurada pelo administrador e não gera código.
-      if (window.JC_PANEL_RUNTIME?.isMaintenance?.(functionId)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      createServerActivationCode(type);
-      return false;
-    }, true);
-  }
   function installServerActivationGenerators() {
-    // Mantém a API usada pelo runtime e também vincula diretamente os dois
-    // botões. O controle de permissões/créditos continua sendo executado antes,
-    // no capture do documento; após a confirmação, o clique repetido chega
-    // exatamente uma vez ao gerador real.
+    // Um único caminho oficial para a geração real. O runtime chama esta API
+    // nas contas comuns; nas contas por créditos, a mesma função é chamada
+    // diretamente depois da confirmação e do débito, sem repetir o clique.
     window.JC_ACTIVATION_CODES = {
       generate: createServerActivationCode,
       mode: () => state.mode,
       profile: () => state.profile,
     };
-    bindServerActivationButton("11");
-    bindServerActivationButton("16");
   }
   function completeGrant() {
     store();
@@ -1143,7 +1123,20 @@
       const confirmation=await confirmCreditUse(f,cost,balance);if(!confirmation.confirmed)return;if(confirmation.popup)el._jcCreditWindow=confirmation.popup;
       const operationId=crypto.randomUUID?crypto.randomUUID():"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,(c)=>{const r=Math.random()*16|0,v=c==="x"?r:(r&3|8);return v.toString(16);});
       const {data,error}=await A.client.rpc("consume_credit",{p_function_id:f.id,p_operation_id:operationId});if(error)throw error;
-      updateCreditBalance(data?.balance);el.dataset.jcReportOperationId=operationId;state.creditBypass.add(el);setTimeout(()=>state.creditBypass.delete(el),3000);el.click();
+      updateCreditBalance(data?.balance);
+
+      // Os ativadores 11/16 não devem depender de um segundo clique automático.
+      // Esse replay podia entrar em conflito com os listeners do gerador e
+      // terminar em “NÃO GERADO” somente nas contas por créditos. Depois do
+      // débito, chama diretamente a mesma função real usada pelas outras contas.
+      if(f.id==="activator11.generate"||f.id==="activator16.generate"){
+        dispatchReportAction(el,f,operationId);
+        await createServerActivationCode(f.id==="activator11.generate"?"11":"16");
+        return;
+      }
+
+      // As demais funções continuam exatamente no fluxo já validado.
+      el.dataset.jcReportOperationId=operationId;state.creditBypass.add(el);setTimeout(()=>state.creditBypass.delete(el),3000);el.click();
     }catch(err){closeReservedCreditWindow(el);demoDialog({name:"Não foi possível usar os créditos"});$("jc_demo_text").textContent=err.message||"Falha ao confirmar o consumo.";}finally{state.creditPending.delete(el);}
   }
   function permissionCapture(e) {

@@ -307,6 +307,37 @@
     sort_order: i,
   }));
 
+
+  // Regra visual e operacional dos clientes por créditos.
+  // Somente estas ações podem consumir créditos no painel do cliente.
+  const CREDIT_CHARGE_ACTIONS = Object.freeze({
+    "activator11.generate": { order: 10, group: "ATIVADORES", label: "Gerar ativação de 11 dígitos", icon: "11" },
+    "activator16.generate": { order: 20, group: "ATIVADORES", label: "Gerar ativação de 16 dígitos", icon: "16" },
+    "config.access": { order: 30, group: "CONFIG", label: "Acesse Aqui — baixar .config", icon: "↓" },
+    "config.generate_codes": { order: 40, group: "CONFIG", label: "Gerar código de download CONFIG", icon: "#" },
+    "package.btv.generate": { order: 50, group: "BTV", label: "Gerar código BTV", icon: "B" },
+    "package.btv.access": { order: 60, group: "BTV", label: "Acesse Aqui BTV", icon: "↗" },
+    "package.stv.generate": { order: 70, group: "STV", label: "Gerar código STV", icon: "S" },
+    "package.stv.access": { order: 80, group: "STV", label: "Acesse Aqui STV", icon: "↗" },
+    "package.xplus.generate": { order: 90, group: "XPLUS", label: "Gerar código XPLUS", icon: "X" },
+    "package.xplus.access": { order: 100, group: "XPLUS", label: "Acesse Aqui XPLUS", icon: "↗" },
+    "package.eaigo.generate": { order: 110, group: "EAIGO", label: "Gerar código EAIGO", icon: "E" },
+    "package.eaigo.access": { order: 120, group: "EAIGO", label: "Acesse Aqui EAIGO", icon: "↗" },
+  });
+
+  function creditActionDefinition(functionId) {
+    return CREDIT_CHARGE_ACTIONS[String(functionId || "")] || null;
+  }
+
+  function isCreditChargeAction(f) {
+    return Boolean(
+      f &&
+      creditActionDefinition(f.id) &&
+      String(f.credit_mode || "").toLowerCase() === "credits" &&
+      Number(f.credit_cost || 0) > 0
+    );
+  }
+
   function previewStorageKey(token) {
     return "jc_admin_preview_" + token;
   }
@@ -1026,19 +1057,68 @@
     document.dispatchEvent(new CustomEvent("jc:report-action",{detail}));
   }
   window.JC_GENERATOR_CONTEXT=window.JC_GENERATOR_CONTEXT||{};
+  function injectCreditCenterStyles(){
+    if($("jc_credit_center_styles"))return;
+    const st=document.createElement("style");st.id="jc_credit_center_styles";
+    st.textContent=`
+      .jc-credit-center{position:relative;margin:16px auto 18px;width:min(1180px,calc(100% - 24px));overflow:hidden;border:1px solid rgba(82,221,255,.28);border-radius:24px;background:linear-gradient(145deg,rgba(7,31,47,.97),rgba(6,18,29,.98));box-shadow:0 22px 60px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.06);color:#fff;font-family:var(--sans,"IBM Plex Sans",Arial,sans-serif)}
+      .jc-credit-center::before{content:"";position:absolute;inset:0 auto auto 0;width:100%;height:3px;background:linear-gradient(90deg,#20d7ff,#28f0a1,#ffd35d)}
+      .jc-credit-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center;padding:20px 22px 15px}.jc-credit-title{display:flex;align-items:center;gap:14px}.jc-credit-title-icon{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(145deg,#13b8e9,#25e19c);color:#06202b;font-size:25px;box-shadow:0 10px 24px rgba(29,215,202,.22)}
+      .jc-credit-eyebrow{display:block;color:#73e8ff;font-size:11px;font-weight:950;letter-spacing:.18em;text-transform:uppercase}.jc-credit-title h2{margin:4px 0 3px;font-size:clamp(19px,2.3vw,27px)}.jc-credit-title p{margin:0;color:#a9bec9;font-size:13px;line-height:1.45}
+      .jc-credit-balance-card{min-width:155px;padding:12px 18px;border-radius:18px;text-align:center;background:linear-gradient(145deg,rgba(32,232,159,.18),rgba(29,181,255,.12));border:1px solid rgba(72,242,186,.32)}.jc-credit-balance-card strong{display:block;font-family:var(--mono,"IBM Plex Mono",monospace);font-size:32px;line-height:1;color:#8dffd1}.jc-credit-balance-card span{display:block;margin-top:6px;color:#c8f7e4;font-size:11px;font-weight:900;letter-spacing:.13em;text-transform:uppercase}
+      .jc-credit-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;padding:0 22px 17px}.jc-credit-action{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:10px;align-items:center;min-height:68px;padding:10px 12px;border-radius:15px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09)}.jc-credit-action-icon{width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:rgba(39,196,244,.13);border:1px solid rgba(69,213,255,.23);font-weight:1000;color:#9eeaff}.jc-credit-action b{display:block;font-size:13px;line-height:1.25}.jc-credit-action small{display:block;margin-top:3px;color:#7895a4;font-size:10px;font-weight:900;letter-spacing:.08em}.jc-credit-cost{white-space:nowrap;padding:6px 8px;border-radius:999px;background:rgba(255,205,91,.13);border:1px solid rgba(255,205,91,.28);color:#ffe09b;font-size:11px;font-weight:950}
+      .jc-credit-note{display:flex;gap:9px;align-items:flex-start;padding:12px 22px 16px;border-top:1px solid rgba(255,255,255,.07);color:#9fb5c0;font-size:12px;line-height:1.5}.jc-credit-note b{color:#d8f7ff}
+      .jc-credit-confirm{display:none;position:fixed;inset:0;z-index:2147483647;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.84);backdrop-filter:blur(9px)}.jc-credit-confirm.show{display:flex}.jc-credit-confirm-box{width:min(480px,96vw);padding:23px;border-radius:23px;background:linear-gradient(150deg,#0b2535,#07141f);border:1px solid rgba(82,221,255,.32);box-shadow:0 30px 100px rgba(0,0,0,.65);color:#fff}.jc-credit-confirm-box h3{margin:0 0 7px;font-size:22px}.jc-credit-confirm-box>p{margin:0 0 15px;color:#aac0ca;line-height:1.5}.jc-credit-summary{display:grid;gap:8px;padding:13px;border-radius:15px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09)}.jc-credit-summary div{display:flex;justify-content:space-between;gap:12px}.jc-credit-summary span{color:#9eb3bd}.jc-credit-summary b{color:#fff}.jc-credit-summary .after b{color:#89ffd0}.jc-credit-confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}.jc-credit-confirm-actions button{border:0;border-radius:12px;padding:12px;font-weight:950;cursor:pointer}.jc-credit-cancel{background:#243845;color:#fff}.jc-credit-accept{background:linear-gradient(135deg,#20d99d,#28bde9);color:#06202b}
+      @media(max-width:900px){.jc-credit-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:620px){.jc-credit-center{width:calc(100% - 14px);border-radius:19px}.jc-credit-head{grid-template-columns:1fr;padding:18px 14px 13px}.jc-credit-balance-card{display:flex;align-items:center;justify-content:center;gap:9px;min-width:0}.jc-credit-balance-card strong{font-size:27px}.jc-credit-balance-card span{margin:0}.jc-credit-actions{grid-template-columns:1fr;padding:0 14px 14px}.jc-credit-note{padding:11px 14px 14px}.jc-credit-confirm-actions{grid-template-columns:1fr}}
+    `;
+    document.head.appendChild(st);
+  }
+  function creditFunctionsForPanel(){
+    const byId=new Map((state.functions||[]).map((f)=>[String(f.id||""),f]));
+    return Object.entries(CREDIT_CHARGE_ACTIONS).map(([id,meta])=>{
+      const f=byId.get(id);if(!f||!allowed(f)||!isCreditChargeAction(f))return null;
+      return {f,meta,cost:Math.max(1,Number(f.credit_cost)||1)};
+    }).filter(Boolean).sort((a,b)=>a.meta.order-b.meta.order);
+  }
+  function renderCreditCenter(){
+    if(accountType()!=="credits"||state.mode==="admin"||state.mode==="test"||state.mode==="preview")return;
+    injectCreditCenterStyles();
+    let center=$("jc_credit_center");
+    if(!center){center=document.createElement("section");center.id="jc_credit_center";center.className="jc-credit-center";const header=document.querySelector(".wrapper .header")||document.querySelector(".header");if(header)header.insertAdjacentElement("afterend",center);else(document.querySelector(".wrapper")||document.body).prepend(center);}
+    const rows=creditFunctionsForPanel();
+    const actions=rows.length?rows.map(({meta,cost})=>`<div class="jc-credit-action"><span class="jc-credit-action-icon">${escapeHtml(meta.icon)}</span><span><b>${escapeHtml(meta.label)}</b><small>${escapeHtml(meta.group)}</small></span><span class="jc-credit-cost">${cost} crédito${cost>1?"s":""}</span></div>`).join(""):`<div class="jc-credit-action" style="grid-column:1/-1"><span class="jc-credit-action-icon">✓</span><span><b>Nenhuma ação com cobrança configurada</b><small>As funções liberadas estão gratuitas neste momento.</small></span></div>`;
+    center.innerHTML=`<div class="jc-credit-head"><div class="jc-credit-title"><span class="jc-credit-title-icon">💳</span><div><span class="jc-credit-eyebrow">Central de créditos</span><h2>Seu saldo e as cobranças do painel</h2><p>Você sempre confirma antes de qualquer desconto.</p></div></div><div class="jc-credit-balance-card"><strong data-jc-credit-value>${Number(state.profile?.credits_balance||0)}</strong><span>créditos disponíveis</span></div></div><div class="jc-credit-actions">${actions}</div><div class="jc-credit-note"><span>ℹ️</span><span><b>Não consomem créditos:</b> abrir menus, visualizar telas, copiar códigos, consultar versões, fechar ou resetar a visualização. Somente as ações listadas acima podem descontar saldo.</span></div>`;
+  }
+  function closeReservedCreditWindow(el){
+    const popup=el?._jcCreditWindow;delete el?._jcCreditWindow;
+    try{if(popup&&!popup.closed)popup.close();}catch(_){ }
+  }
+  function confirmCreditUse(f,cost,balance){
+    injectCreditCenterStyles();
+    return new Promise((resolve)=>{
+      let modal=$("jc_credit_confirm");
+      if(!modal){modal=document.createElement("div");modal.id="jc_credit_confirm";modal.className="jc-credit-confirm";modal.innerHTML=`<div class="jc-credit-confirm-box" role="dialog" aria-modal="true"><h3>Confirmar uso de créditos</h3><p id="jc_credit_confirm_name"></p><div class="jc-credit-summary"><div><span>Custo da ação</span><b id="jc_credit_confirm_cost"></b></div><div><span>Saldo atual</span><b id="jc_credit_confirm_balance"></b></div><div class="after"><span>Saldo após confirmar</span><b id="jc_credit_confirm_after"></b></div></div><div class="jc-credit-confirm-actions"><button type="button" class="jc-credit-cancel" id="jc_credit_confirm_cancel">Cancelar</button><button type="button" class="jc-credit-accept" id="jc_credit_confirm_accept">Confirmar e continuar</button></div></div>`;document.body.appendChild(modal);}
+      const finish=(confirmed)=>{modal.classList.remove("show");modal.setAttribute("aria-hidden","true");let popup=null;if(confirmed&&String(f.action_kind||"")==="link"){try{popup=window.open("about:blank","_blank");if(popup){popup.document.title="JC-APK TV — preparando acesso";popup.document.body.innerHTML='<p style="font-family:Arial;padding:24px">Preparando seu acesso...</p>';}}catch(_){popup=null;}}resolve({confirmed,popup});};
+      $("jc_credit_confirm_name").textContent=(creditActionDefinition(f.id)?.label||f.name||"Esta função")+".";
+      $("jc_credit_confirm_cost").textContent=cost+" crédito"+(cost>1?"s":"");
+      $("jc_credit_confirm_balance").textContent=balance+" crédito"+(balance!==1?"s":"");
+      $("jc_credit_confirm_after").textContent=(balance-cost)+" crédito"+(balance-cost!==1?"s":"");
+      $("jc_credit_confirm_cancel").onclick=()=>finish(false);$("jc_credit_confirm_accept").onclick=()=>finish(true);modal.onclick=(event)=>{if(event.target===modal)finish(false);};modal.classList.add("show");modal.setAttribute("aria-hidden","false");
+    });
+  }
   function updateCreditBalance(balance){
-    state.profile.credits_balance=Number(balance||0);const el=$("jc_credit_balance");if(el)el.textContent=state.profile.credits_balance+" créditos";
+    state.profile.credits_balance=Number(balance||0);document.querySelectorAll("[data-jc-credit-value]").forEach((el)=>{el.textContent=state.profile.credits_balance;});
   }
   async function consumeCreditAndReplay(el,f){
     if(state.creditPending.has(el))return;state.creditPending.add(el);
     try{
       const cost=Math.max(1,Number(f.credit_cost)||1);const balance=Number(state.profile.credits_balance||0);
       if(balance<cost){demoDialog({name:"Créditos insuficientes"});$("jc_demo_text").textContent=`Seus créditos acabaram ou são insuficientes. Saldo atual: ${balance}. As funções gratuitas continuam disponíveis. Entre em contato para comprar mais.`;return;}
-      if(!confirm(`Esta função utiliza ${cost} crédito${cost>1?"s":""}. Saldo atual: ${balance}. Deseja continuar?`))return;
+      const confirmation=await confirmCreditUse(f,cost,balance);if(!confirmation.confirmed)return;if(confirmation.popup)el._jcCreditWindow=confirmation.popup;
       const operationId=crypto.randomUUID?crypto.randomUUID():"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,(c)=>{const r=Math.random()*16|0,v=c==="x"?r:(r&3|8);return v.toString(16);});
       const {data,error}=await A.client.rpc("consume_credit",{p_function_id:f.id,p_operation_id:operationId});if(error)throw error;
       updateCreditBalance(data?.balance);el.dataset.jcReportOperationId=operationId;state.creditBypass.add(el);setTimeout(()=>state.creditBypass.delete(el),3000);el.click();
-    }catch(err){demoDialog({name:"Não foi possível usar os créditos"});$("jc_demo_text").textContent=err.message||"Falha ao confirmar o consumo.";}finally{state.creditPending.delete(el);}
+    }catch(err){closeReservedCreditWindow(el);demoDialog({name:"Não foi possível usar os créditos"});$("jc_demo_text").textContent=err.message||"Falha ao confirmar o consumo.";}finally{state.creditPending.delete(el);}
   }
   function permissionCapture(e) {
     const el=e.target.closest("[data-jc-function-id]");if(!el)return;
@@ -1077,7 +1157,7 @@
       const buy=$("jc_demo_buy");if(buy)buy.style.display="none";
       return;
     }
-    if(accountType()==="credits"&&f.credit_mode==="credits"&&Number(f.credit_cost||0)>0){
+    if(accountType()==="credits"&&isCreditChargeAction(f)){
       // O bypass pertence somente ao elemento clicado. Ele não libera os
       // demais pacotes e existe apenas para repetir o clique após o débito.
       if(state.creditBypass.has(el)){
@@ -1223,7 +1303,7 @@
     const attLabel=state.mode==="admin"?"Gerenciar atendentes":"Minha Atendente";
     const title=state.mode==="test"?"🧪 Modo de demonstração":preview?"🔎 Pré-teste de "+escapeHtml(state.profile.full_name||state.profile.username):"Olá, "+escapeHtml(state.profile.full_name||state.profile.username);
     const labels={monthly:"Plano mensal",one_time:"Pagamento único — sem mensalidades",credits:"Acesso por créditos",test:"Teste temporário"};const subtitle=state.mode==="admin"?"Administrador":state.mode==="test"?"Acesso visual completo, com códigos fictícios e sem downloads reais":preview?"Verde = liberado • Amarelo = bloqueado em demonstração":labels[type]||escapeHtml(state.profile.plan_name||"Cliente");
-    const credit=type==="credits"?`<span class="jc-credit-banner" id="jc_credit_balance">${Number(state.profile.credits_balance||0)} créditos</span>`:"";const reseller=Boolean(state.profile?.is_reseller)&&state.access?.reseller?.enabled!==false&&!preview&&state.mode!=="test"?'<a class="reseller" href="../painel-revenda.html">📊 Minha revenda</a>':"";const expiry=type==="test"&&state.profile.trial_expires_at?" • termina "+new Date(state.profile.trial_expires_at).toLocaleString("pt-BR"):type==="monthly"&&state.profile.expires_at?" • vence "+formatDate(state.profile.expires_at):"";
+    const credit="";const reseller=Boolean(state.profile?.is_reseller)&&state.access?.reseller?.enabled!==false&&!preview&&state.mode!=="test"?'<a class="reseller" href="../painel-revenda.html">📊 Minha revenda</a>':"";const expiry=type==="test"&&state.profile.trial_expires_at?" • termina "+new Date(state.profile.trial_expires_at).toLocaleString("pt-BR"):type==="monthly"&&state.profile.expires_at?" • vence "+formatDate(state.profile.expires_at):"";
     const shop=purchasable().length&&state.mode!=="admin"&&!preview?'<button id="jc_open_market" class="jc-shop-button">🛒 Funções e preços</button>':"";
     const attendantActions=attEnabled&&!preview&&state.mode!=="test"
       ? (state.mode==="admin"
@@ -1233,6 +1313,7 @@
     bar.innerHTML=`<div class="jc-client-info"><span class="jc-client-avatar">${profileAvatarMarkup()}</span><span><b>${title}</b><small>${subtitle}${expiry}</small></span></div><div class="jc-client-actions">${credit}${reseller}${shop}${attendantActions}${state.mode!=="test"&&!preview?'<button id="jc_change_password">Minha senha</button>':""}<button id="jc_logout" class="logout">${preview?"Fechar pré-teste":"Sair"}</button></div>${state.mode==="test"?'<div class="jc-demo-banner">MODO TESTE — o painel abre completo para avaliação, mas links e downloads verdadeiros são bloqueados. Consulte os valores em “Funções e preços”.</div>':""}${preview?'<div class="jc-preview-banner">PRÉ-TESTE ADMINISTRATIVO — confira as funções e depois aprove o acesso no painel.</div>':""}`;
     const header=wrapper.querySelector(".header");if(header)header.insertAdjacentElement("afterend",bar);else wrapper.prepend(bar);
     $("jc_logout").onclick=async()=>{if(preview){window.close();return;}if(A.client)await A.client.auth.signOut();sessionStorage.clear();location.reload();};if($("jc_change_password"))$("jc_change_password").onclick=showPasswordModal;if($("jc_open_market"))$("jc_open_market").onclick=()=>openPurchaseCenter();
+    renderCreditCenter();
     setTimeout(installPriceChips,200);
   }
   function escapeHtml(v) {

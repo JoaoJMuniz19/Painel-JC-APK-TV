@@ -182,11 +182,28 @@
     });
   }
 
-  async function openUrl(url) {
+  function closeReservedWindow(element) {
+    const reserved = element?._jcCreditWindow;
+    if (element) delete element._jcCreditWindow;
+    try { if (reserved && !reserved.closed) reserved.close(); } catch (_) {}
+  }
+
+  async function openUrl(url, element) {
     const raw = String(url || "").trim();
-    if (!LINK_SCHEMES.test(raw)) throw new Error("O endereço configurado é inválido.");
+    if (!LINK_SCHEMES.test(raw)) {
+      closeReservedWindow(element);
+      throw new Error("O endereço configurado é inválido.");
+    }
+    const reserved = element?._jcCreditWindow;
+    if (element) delete element._jcCreditWindow;
+    if (reserved && !reserved.closed) {
+      reserved.opener = null;
+      reserved.location.replace(raw);
+      return;
+    }
     const win = window.open(raw, "_blank", "noopener,noreferrer");
     if (win) win.opener = null;
+    else window.location.assign(raw);
   }
 
   async function openConfiguredLink(linkId, element) {
@@ -198,15 +215,16 @@
     const row = state.links.get(String(linkId || ""));
     const options = rowLinkOptions(row);
     if (!options.length) {
+      closeReservedWindow(element);
       notify("Este botão ainda não possui link configurado no Supabase.", "error");
       return;
     }
     let option = options[0];
     if (options.length > 1) {
       option = await chooseOption(row?.name || element?.dataset?.jcLinkName || "Escolha uma opção", "Há mais de uma opção configurada para este botão.", options, "link");
-      if (!option) return;
+      if (!option) { closeReservedWindow(element); return; }
     }
-    await openUrl(option.url);
+    await openUrl(option.url, element);
   }
 
   function demoCode(length) {
@@ -502,5 +520,6 @@
     reload: () => Promise.all([loadCatalog(true), loadMaintenance()]),
     openLink: openConfiguredLink,
     getLink: (id) => state.links.get(id) || null,
+    isMaintenance: (id) => state.maintenance.get(String(id || ""))?.status === "maintenance",
   };
 })();

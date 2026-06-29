@@ -24,6 +24,10 @@
     { id: "stv_download_codes", name: "STV — CÓDIGOS", group: "Pacote de APK", type: "code", sort: 250 },
     { id: "xplus_download_codes", name: "XPLUS — CÓDIGOS", group: "Pacote de APK", type: "code", sort: 260 },
     { id: "eaigo_download_codes", name: "EAIGO — CÓDIGOS", group: "Pacote de APK", type: "code", sort: 270 },
+    { id: "launcher_lite_download_codes", name: "JC Launcher Lite — códigos", group: "JC Launcher Lite / Pro", type: "code", sort: 280 },
+    { id: "launcher_pro_download_codes", name: "JC Launcher Pro — códigos", group: "JC Launcher Lite / Pro", type: "code", sort: 290 },
+    { id: "launcher_lite_apk", name: "JC Launcher Lite APK", group: "JC Launcher Lite / Pro", type: "link", sort: 380 },
+    { id: "launcher_pro_apk", name: "JC Launcher Pro APK", group: "JC Launcher Lite / Pro", type: "link", sort: 390 },
   ];
 
   const CURRENT_KNOWN_MANAGED_IDS = new Set(EMERGENCY_DEFINITIONS.map((item) => item.id));
@@ -93,7 +97,7 @@
       map.set("code:" + id, {
         id,
         name: normalizedLabel(element, slug.toUpperCase() + " — CÓDIGOS"),
-        group: "Pacote de APK",
+        group: String(element.getAttribute("data-jc-function-category") || "Pacote de APK"),
         type: "code",
         sort: 600 + index,
       });

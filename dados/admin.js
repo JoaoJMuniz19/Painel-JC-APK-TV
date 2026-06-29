@@ -1160,7 +1160,7 @@
     $("permissionTree").innerHTML = Object.entries(groups)
       .map(
         ([gid, g]) =>
-          `<div class="perm-group"><div class="perm-head"><strong>${esc(g.name)}</strong><label class="check"><input type="checkbox" data-group-all="${esc(gid)}"><span>Liberar tudo</span></label></div>${g.items.map((f) => `<label class="check"><input type="checkbox" class="perm-check" data-group="${esc(gid)}" value="${esc(f.id)}" ${selected.has(f.id) ? "checked" : ""}><span>${esc(f.name)}${f.protected ? "<small>Função fixa/protegida</small>" : ""}</span></label>`).join("")}</div>`,
+          `<div class="perm-group"><div class="perm-head"><strong>${esc(g.name)}</strong><label class="check"><input type="checkbox" data-group-all="${esc(gid)}"><span>Liberar tudo</span></label></div>${gid==="launcher"?'<div class="jc-launcher-admin-note"><strong>Licença separada:</strong> liberar a função permite acessar o módulo, mas cada Box continua usando a regra própria de 1 crédito por mês.<small>Lite e Pro podem ser liberadas separadamente; o saldo do Launcher não depende do plano principal do cliente.</small></div>':''}${g.items.map((f) => `<label class="check"><input type="checkbox" class="perm-check" data-group="${esc(gid)}" value="${esc(f.id)}" ${selected.has(f.id) ? "checked" : ""}><span>${esc(f.name)}${f.protected ? "<small>Função fixa/protegida</small>" : ""}</span></label>`).join("")}</div>`,
       )
       .join("");
     document.querySelectorAll("[data-group-all]").forEach((ch) => {

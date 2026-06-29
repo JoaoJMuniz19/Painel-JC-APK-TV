@@ -61,7 +61,7 @@
       <div class="stat"><small>Total de códigos</small><b id="cleanupStatTotal">0</b><span>11 e 16 dígitos</span></div>
       <div class="stat"><small>Vencidos após 3 dias</small><b id="cleanupStatExpired">0</b><span>Bloqueados aguardando decisão</span></div>
       <div class="stat"><small>Limpeza seletiva</small><b>Ativa</b><span>Escolha exatamente o que deseja zerar</span></div>
-      <div class="stat"><small>Backup antes de apagar</small><b>Ativo</b><span>Snapshot administrativo</span></div>
+      <div class="stat"><small>Backup antes de apagar</small><b>Ativo</b><span>Snapshot administrativo</span></div><div class="stat"><small>Boxes Launcher</small><b id="cleanupLauncherDevices">0</b><span>Lite e Pro vinculadas</span></div><div class="stat"><small>Licenças Launcher</small><b id="cleanupLauncherLicenses">0</b><span>ativas no módulo</span></div>
     </section>
 
     <section class="card">
@@ -77,6 +77,7 @@
               <option value="delete_expired">Limpar códigos vencidos após 3 dias</option>
               <option value="reset_attendants">Zerar somente os relatórios das atendentes</option>
               <option value="reset_reports">Zerar JC Relatórios e relatórios das atendentes</option>
+              <optgroup label="JC Launcher Lite / Pro"><option value="reset_launcher_reports">Zerar relatórios e eventos do Launcher</option><option value="reset_launcher_commands">Limpar fila e histórico de comandos</option><option value="detach_launcher_devices">Desvincular todas as Boxes</option><option value="wipe_launcher_data">Limpar todos os dados do Launcher</option></optgroup>
               <option value="wipe_all">Limpar tudo real e iniciar do zero</option>
             </select>
           </div>
@@ -139,7 +140,7 @@
 (function(){
   'use strict';
   const A=window.JC_APP,$=id=>document.getElementById(id),EDGE='jc-activate';
-  const state={busy:false,unlocked:false,mode:'',codes:[],expiredCount:0,history:[]};
+  const state={busy:false,unlocked:false,mode:'',codes:[],expiredCount:0,history:[],launcherStats:{devices:0,active_licenses:0}};
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const format=value=>{if(!value)return '—';const d=new Date(value);return Number.isNaN(d.getTime())?String(value):d.toLocaleString('pt-BR');};
 
@@ -202,8 +203,8 @@
     box.querySelector('small').textContent=detail;
   }
 
-  function confirmationFor(mode){return {reset_usage:'ZERAR ATIVACOES',delete_expired:'LIMPAR VENCIDOS',reset_attendants:'ZERAR ATENDENTES',reset_reports:'ZERAR RELATORIOS',wipe_all:'ZERAR TUDO'}[mode]||'';}
-  function modeLabel(mode){return {reset_usage:'todas as ativações, tentativas, entregas .config e histórico técnico, mantendo os códigos',delete_expired:'todos os códigos vencidos após três dias sem uso',reset_attendants:'somente os registros dos relatórios das atendentes',reset_reports:'todo o JC Relatórios e também os relatórios das atendentes',wipe_all:'todos os códigos, ativações, tentativas, entregas .config, histórico técnico, JC Relatórios e relatórios das atendentes'}[mode]||'a operação selecionada';}
+  function confirmationFor(mode){return {reset_usage:'ZERAR ATIVACOES',delete_expired:'LIMPAR VENCIDOS',reset_attendants:'ZERAR ATENDENTES',reset_reports:'ZERAR RELATORIOS',reset_launcher_reports:'ZERAR RELATORIOS LAUNCHER',reset_launcher_commands:'LIMPAR COMANDOS LAUNCHER',detach_launcher_devices:'DESVINCULAR BOXES LAUNCHER',wipe_launcher_data:'ZERAR LAUNCHER',wipe_all:'ZERAR TUDO'}[mode]||'';}
+  function modeLabel(mode){return {reset_usage:'todas as ativações, tentativas, entregas .config e histórico técnico, mantendo os códigos',delete_expired:'todos os códigos vencidos após três dias sem uso',reset_attendants:'somente os registros dos relatórios das atendentes',reset_reports:'todo o JC Relatórios e também os relatórios das atendentes',reset_launcher_reports:'os relatórios, eventos e telemetria do JC Launcher',reset_launcher_commands:'a fila e o histórico de comandos do JC Launcher',detach_launcher_devices:'os vínculos e tokens das Boxes do JC Launcher',wipe_launcher_data:'todos os dados próprios do JC Launcher Lite/Pro',wipe_all:'todos os códigos, ativações, tentativas, entregas .config, histórico técnico, JC Relatórios e relatórios das atendentes'}[mode]||'a operação selecionada';}
 
   function modeDetails(mode){
     return {
@@ -211,6 +212,10 @@
       delete_expired:{title:'Limpar vencidos após 3 dias',text:`Apaga somente os ${state.expiredCount} código(s) bloqueado(s) por “Não utilizado em 3 dias” e sem ativação confirmada.`,phrase:'LIMPAR VENCIDOS',tone:'warning'},
       reset_attendants:{title:'Zerar somente os relatórios das atendentes',text:'Apaga apenas os registros em public.attendant_reports e zera o contador “Atendentes com registros”. Não apaga atendentes, configurações, clientes, mídias ou permissões.',phrase:'ZERAR ATENDENTES',tone:'warning'},
       reset_reports:{title:'Zerar JC Relatórios e relatórios das atendentes',text:'Apaga acessos registrados, histórico individual, testes do ADM, créditos consumidos e também os relatórios das atendentes. Não altera saldo atual nem total comprado.',phrase:'ZERAR RELATORIOS',tone:'warning'},
+      reset_launcher_reports:{title:'Zerar relatórios e eventos do JC Launcher',text:'Apaga somente eventos técnicos, acessos e telemetria do Launcher. Preserva Boxes, licenças, clientes, créditos e comandos.',phrase:'ZERAR RELATORIOS LAUNCHER',tone:'warning'},
+      reset_launcher_commands:{title:'Limpar fila e histórico de comandos do Launcher',text:'Apaga comandos pendentes, entregues, concluídos e seus retornos. Preserva Boxes, licenças e eventos.',phrase:'LIMPAR COMANDOS LAUNCHER',tone:'warning'},
+      detach_launcher_devices:{title:'Desvincular todas as Boxes do Launcher',text:'Remove os vínculos e tokens das Boxes sem apagar clientes nem saldos. Os APKs precisarão ser vinculados novamente.',phrase:'DESVINCULAR BOXES LAUNCHER',tone:'danger'},
+      wipe_launcher_data:{title:'Limpar todos os dados do JC Launcher',text:'Apaga Boxes, licenças, comandos, eventos e vínculos do Launcher Lite/Pro. Não apaga clientes nem os módulos antigos.',phrase:'ZERAR LAUNCHER',tone:'danger'},
       wipe_all:{title:'Limpar tudo real — iniciar do zero',text:`Apaga os ${state.codes.length} código(s), ativações, tentativas, entregas, histórico técnico e todos os registros do JC Relatórios. Clientes, saldos, créditos comprados, permissões, WhatsApps, APKs e arquivos físicos permanecem.`,phrase:'ZERAR TUDO',tone:'danger'}
     }[mode]||null;
   }
@@ -242,12 +247,18 @@
     renderHistory(data.history||[]);
   }
 
+
+  async function loadLauncherStatsSafe(){
+    try{const {data,error}=await A.client.rpc('admin_launcher_cleanup_stats');if(error)throw error;state.launcherStats=data||{};}
+    catch(error){state.launcherStats={devices:0,active_licenses:0,pending_integration:true};}
+    $('cleanupLauncherDevices').textContent=state.launcherStats.devices||0;$('cleanupLauncherLicenses').textContent=state.launcherStats.active_licenses||0;
+  }
   async function loadAll(force=false){
     if(!state.unlocked)return;
     if(state.busy&&!force)return;
     state.busy=true;setStatus('','Carregando central administrativa...','Conferindo códigos vencidos e histórico de limpeza.');
     try{
-      const [codesData,historyData]=await Promise.all([invoke('admin_list_codes',{filters:{limit:1000}}),invoke('admin_list_cleanup_history',{limit:200})]);
+      const [codesData,historyData]=await Promise.all([invoke('admin_list_codes',{filters:{limit:1000}}),invoke('admin_list_cleanup_history',{limit:200})]);await loadLauncherStatsSafe();
       if(codesData.access_mode!=='admin')throw new Error('Acesso exclusivo do ADM.');
       state.codes=codesData.codes||[];renderCounts();renderHistory(historyData.history||[]);
       setStatus('','Central de limpeza pronta',`${state.codes.length} código(s) conferidos. Escolha uma operação e confirme a frase de segurança.`);
@@ -282,7 +293,7 @@
   function openConfirm(){
     const mode=$('cleanupModeSelect').value;if(!mode)return A.toast('Escolha primeiro o tipo de limpeza.','error');
     state.mode=mode;const phrase=confirmationFor(mode);
-    $('cleanupModalSummary').innerHTML=`Você está prestes a alterar <b>${esc(modeLabel(mode))}</b>.<br><br>Digite exatamente <b>${esc(phrase)}</b>. Antes da operação será criado um backup integral.`;
+    $('cleanupModalSummary').innerHTML=`Você está prestes a alterar <b>${esc(modeLabel(mode))}</b>.<br><br>Digite exatamente <b>${esc(phrase)}</b>. ${String(mode).includes('launcher')?'Será salvo um snapshot de auditoria do módulo antes da operação.':'Antes da operação será criado o backup administrativo previsto pelo sistema.'}`;
     $('cleanupStrongConfirmation').value='';$('cleanupStrongConfirmation').placeholder=phrase;$('cleanupConfirmModal').classList.add('show');setTimeout(()=>$('cleanupStrongConfirmation').focus(),0);
   }
   function closeConfirm(){if(state.busy)return;$('cleanupConfirmModal').classList.remove('show');$('cleanupStrongConfirmation').value='';}
@@ -294,10 +305,15 @@
     state.busy=true;$('cleanupExecuteBtn').disabled=true;$('cleanupExecuteBtn').textContent='Executando limpeza...';
     try{
       await getValidSession(true);
-      const data=await invoke('admin_real_cleanup',{mode:state.mode,confirmation});
+      let data;if(String(state.mode).includes('launcher')){const response=await A.client.rpc('admin_launcher_cleanup',{p_mode:state.mode,p_confirmation:confirmation});if(response.error)throw response.error;data={result:response.data||{}};}else data=await invoke('admin_real_cleanup',{mode:state.mode,confirmation});
       const result=data.result||{};
-      const total=(result.deleted_codes||0)+(result.reset_codes||0)+(result.deleted_activations||0)+(result.deleted_deliveries||0)+(result.deleted_report_events||0)+(result.deleted_attendant_reports||0);
-      A.toast(`Operação concluída. ${result.deleted_codes||0} código(s) apagado(s), ${result.reset_codes||0} reativado(s), ${result.deleted_activations||0} ativação(ões), ${result.deleted_deliveries||0} entrega(s), ${result.deleted_report_events||0} registro(s) do JC Relatórios e ${result.deleted_attendant_reports||0} relatório(s) das atendentes removido(s). Total: ${total}.`);
+      if(String(state.mode).includes('launcher')){
+        const total=(result.deleted_events||0)+(result.deleted_commands||0)+(result.deleted_licenses||0)+(result.affected_devices||0);
+        A.toast(`Operação do Launcher concluída. ${result.deleted_events||0} evento(s), ${result.deleted_commands||0} comando(s), ${result.deleted_licenses||0} licença(s) e ${result.affected_devices||0} Box(es) afetada(s). Total: ${total}.`);
+      }else{
+        const total=(result.deleted_codes||0)+(result.reset_codes||0)+(result.deleted_activations||0)+(result.deleted_deliveries||0)+(result.deleted_report_events||0)+(result.deleted_attendant_reports||0);
+        A.toast(`Operação concluída. ${result.deleted_codes||0} código(s) apagado(s), ${result.reset_codes||0} reativado(s), ${result.deleted_activations||0} ativação(ões), ${result.deleted_deliveries||0} entrega(s), ${result.deleted_report_events||0} registro(s) do JC Relatórios e ${result.deleted_attendant_reports||0} relatório(s) das atendentes removido(s). Total: ${total}.`);
+      }
       $('cleanupConfirmModal').classList.remove('show');$('cleanupStrongConfirmation').value='';await loadAll(true);
     }catch(error){const message=readable(error)||'Falha na limpeza.';A.toast(message,'error');setStatus('error','A limpeza não foi concluída',message);}
     finally{state.busy=false;$('cleanupExecuteBtn').disabled=false;$('cleanupExecuteBtn').textContent='Confirmar e executar';}

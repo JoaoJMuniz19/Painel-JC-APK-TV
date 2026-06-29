@@ -76,7 +76,34 @@
     if (status) status.className = "status-bar";
   }
 
+  function mainSectionCard(section) {
+    if (section === "activation") return $("activation_full_toggle")?.closest(".activation-card-real") || null;
+    if (section === "package") return $("pacote_apk_full_toggle")?.closest(".pacote-apk-card, .pacote-apk-card-real") || null;
+    return null;
+  }
+
+  function setMainSectionClosed(section, closed) {
+    const card = mainSectionCard(section);
+    if (!card) return;
+    card.classList.toggle("menu-closed", Boolean(closed));
+    const toggle = section === "activation" ? $("activation_full_toggle") : $("pacote_apk_full_toggle");
+    const icon = section === "activation" ? $("activation_full_toggle_icon") : $("pacote_apk_full_toggle_icon");
+    if (toggle) toggle.setAttribute("aria-expanded", closed ? "false" : "true");
+    if (icon) icon.textContent = closed ? "▸" : "▾";
+    if (closed && section === "activation") closeActivationSubmenus("");
+    if (closed && section === "package") closePackageSubmenus("");
+  }
+
+  function openMainSection(section) {
+    if (section !== "activation") setMainSectionClosed("activation", true);
+    if (section !== "package") setMainSectionClosed("package", true);
+    setMainSectionClosed(section, false);
+    document.dispatchEvent(new CustomEvent("jc:main-section-open", { detail: { section } }));
+  }
+
   function openConfig() {
+    openMainSection("activation");
+    closePackageSubmenus("");
     closeActivationSubmenus("config");
     const notice = $("config_notice");
     const count = $("config_notice_count");
@@ -90,6 +117,8 @@
   function openActivator(type) {
     const normalized = String(type) === "11" ? "11" : "16";
     const key = "activator" + normalized;
+    openMainSection("activation");
+    closePackageSubmenus("");
     closeActivationSubmenus(key);
     const notice = $("ativador" + normalized + "_notice");
     const count = $("ativador" + normalized + "_notice_count");
@@ -105,6 +134,8 @@
   function openPackage(slug) {
     const safe = ["btv", "stv", "xplus", "eaigo"].includes(String(slug)) ? String(slug) : "";
     if (!safe) return;
+    openMainSection("package");
+    closeActivationSubmenus("");
     closePackageSubmenus(safe);
     const section = $("jc_pacote_submenu_" + safe);
     const tools = $("jc_package_tools_" + safe);
@@ -132,15 +163,22 @@
     });
   }
 
-  function toggleCard(toggleId, cardSelector, iconId) {
+  function toggleCard(toggleId, cardSelector, iconId, section) {
     const toggle = $(toggleId);
     const card = toggle?.closest(cardSelector) || document.querySelector(cardSelector);
     if (!card) return;
+    const opening = card.classList.contains("menu-closed");
+    if (opening && section) {
+      openMainSection(section);
+      return;
+    }
     card.classList.toggle("menu-closed");
     const closed = card.classList.contains("menu-closed");
     const icon = $(iconId);
     if (icon) icon.textContent = closed ? "▸" : "▾";
     if (toggle) toggle.setAttribute("aria-expanded", closed ? "false" : "true");
+    if (closed && section === "activation") closeActivationSubmenus("");
+    if (closed && section === "package") closePackageSubmenus("");
   }
 
   function toggleTutorial(header) {
@@ -232,10 +270,23 @@
 
   function prepareVideos() {
     document.querySelectorAll(".mine-tv-demo video, .jc-package-video, .jc-reminder-mini-screen video").forEach((video) => {
-      if (!video.getAttribute("src")) video.setAttribute("src", VIDEO_SOURCE);
+      let source = video.querySelector("source");
+      if (!source) {
+        source = document.createElement("source");
+        source.type = "video/mp4";
+        video.appendChild(source);
+      }
+      source.src = VIDEO_SOURCE;
+      video.setAttribute("autoplay", "");
+      video.setAttribute("muted", "");
+      video.setAttribute("loop", "");
+      video.setAttribute("playsinline", "");
+      video.setAttribute("preload", "auto");
       video.muted = true;
+      video.defaultMuted = true;
       video.loop = true;
       video.playsInline = true;
+      try { video.load(); } catch (_) {}
       const promise = video.play();
       if (promise?.catch) promise.catch(() => {});
     });
@@ -301,8 +352,8 @@
     openPackage,
     closeActivationSubmenus,
     closePackageSubmenus,
-    toggleActivationMenu: () => toggleCard("activation_full_toggle", ".activation-card-real", "activation_full_toggle_icon"),
-    togglePackageMenu: () => toggleCard("pacote_apk_full_toggle", ".pacote-apk-card, .pacote-apk-card-real", "pacote_apk_full_toggle_icon"),
+    toggleActivationMenu: () => toggleCard("activation_full_toggle", ".activation-card-real", "activation_full_toggle_icon", "activation"),
+    togglePackageMenu: () => toggleCard("pacote_apk_full_toggle", ".pacote-apk-card, .pacote-apk-card-real", "pacote_apk_full_toggle_icon", "package"),
     toggleTutorial,
     setStatus,
     setCode,
@@ -314,6 +365,8 @@
     clearCounters,
     resetPreview,
     setActive,
+    openMainSection,
+    setMainSectionClosed,
   };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initialize, { once: true });

@@ -61,7 +61,7 @@
       <div class="stat"><small>Total de códigos</small><b id="cleanupStatTotal">0</b><span>11 e 16 dígitos</span></div>
       <div class="stat"><small>Vencidos após 3 dias</small><b id="cleanupStatExpired">0</b><span>Bloqueados aguardando decisão</span></div>
       <div class="stat"><small>Limpeza seletiva</small><b>Ativa</b><span>Escolha exatamente o que deseja zerar</span></div>
-      <div class="stat"><small>Backup antes de apagar</small><b>Ativo</b><span>Snapshot administrativo</span></div><div class="stat"><small>Boxes Launcher</small><b id="cleanupLauncherDevices">0</b><span>Lite e Pro vinculadas</span></div><div class="stat"><small>Licenças Launcher</small><b id="cleanupLauncherLicenses">0</b><span>ativas no módulo</span></div>
+      <div class="stat"><small>Backup antes de apagar</small><b>Ativo</b><span>Snapshot administrativo</span></div><div class="stat"><small>Boxes Launcher</small><b id="cleanupLauncherDevices">0</b><span>Lite e Pro vinculadas</span></div><div class="stat"><small>Licenças Launcher</small><b id="cleanupLauncherLicenses">0</b><span>ativas no módulo</span></div><div class="stat"><small>Cobranças Launcher</small><b id="cleanupLauncherBilling">0</b><span>mensais ativas</span></div>
     </section>
 
     <section class="card">
@@ -140,7 +140,7 @@
 (function(){
   'use strict';
   const A=window.JC_APP,$=id=>document.getElementById(id),EDGE='jc-activate';
-  const state={busy:false,unlocked:false,mode:'',codes:[],expiredCount:0,history:[],launcherStats:{devices:0,active_licenses:0}};
+  const state={busy:false,unlocked:false,mode:'',codes:[],expiredCount:0,history:[],launcherStats:{devices:0,active_licenses:0,active_billing:0}};
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const format=value=>{if(!value)return '—';const d=new Date(value);return Number.isNaN(d.getTime())?String(value):d.toLocaleString('pt-BR');};
 
@@ -215,7 +215,7 @@
       reset_launcher_reports:{title:'Zerar relatórios e eventos do JC Launcher',text:'Apaga somente eventos técnicos, acessos e telemetria do Launcher. Preserva Boxes, licenças, clientes, créditos e comandos.',phrase:'ZERAR RELATORIOS LAUNCHER',tone:'warning'},
       reset_launcher_commands:{title:'Limpar fila e histórico de comandos do Launcher',text:'Apaga comandos pendentes, entregues, concluídos e seus retornos. Preserva Boxes, licenças e eventos.',phrase:'LIMPAR COMANDOS LAUNCHER',tone:'warning'},
       detach_launcher_devices:{title:'Desvincular todas as Boxes do Launcher',text:'Remove os vínculos e tokens das Boxes sem apagar clientes nem saldos. Os APKs precisarão ser vinculados novamente.',phrase:'DESVINCULAR BOXES LAUNCHER',tone:'danger'},
-      wipe_launcher_data:{title:'Limpar todos os dados do JC Launcher',text:'Apaga Boxes, licenças, comandos, eventos e vínculos do Launcher Lite/Pro. Não apaga clientes nem os módulos antigos.',phrase:'ZERAR LAUNCHER',tone:'danger'},
+      wipe_launcher_data:{title:'Limpar todos os dados do JC Launcher',text:'Apaga Boxes, licenças, cobranças mensais, comandos, eventos e vínculos do Launcher Lite/Pro. Não apaga clientes nem os módulos antigos.',phrase:'ZERAR LAUNCHER',tone:'danger'},
       wipe_all:{title:'Limpar tudo real — iniciar do zero',text:`Apaga os ${state.codes.length} código(s), ativações, tentativas, entregas, histórico técnico e todos os registros do JC Relatórios. Clientes, saldos, créditos comprados, permissões, WhatsApps, APKs e arquivos físicos permanecem.`,phrase:'ZERAR TUDO',tone:'danger'}
     }[mode]||null;
   }
@@ -250,8 +250,8 @@
 
   async function loadLauncherStatsSafe(){
     try{const {data,error}=await A.client.rpc('admin_launcher_cleanup_stats');if(error)throw error;state.launcherStats=data||{};}
-    catch(error){state.launcherStats={devices:0,active_licenses:0,pending_integration:true};}
-    $('cleanupLauncherDevices').textContent=state.launcherStats.devices||0;$('cleanupLauncherLicenses').textContent=state.launcherStats.active_licenses||0;
+    catch(error){state.launcherStats={devices:0,active_licenses:0,active_billing:0,pending_integration:true};}
+    $('cleanupLauncherDevices').textContent=state.launcherStats.devices||0;$('cleanupLauncherLicenses').textContent=state.launcherStats.active_licenses||0;$('cleanupLauncherBilling').textContent=state.launcherStats.active_billing||0;
   }
   async function loadAll(force=false){
     if(!state.unlocked)return;

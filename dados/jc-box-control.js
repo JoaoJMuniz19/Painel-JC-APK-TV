@@ -33,6 +33,7 @@
     syncAudit:null,
     automation:null,
     pendingCommand:'',
+    equipmentRequestBlock:false,
     lastError:null
   };
 
@@ -192,6 +193,8 @@
 
   async function loadSelectedData(){
     if(!state.selected){renderAll();return;}
+    // A escolha de bloquear nesta solicitação é temporária e recomeça desmarcada ao recarregar a Box.
+    state.equipmentRequestBlock=false;
     loading(true,'Carregando configurações da Box');
     const owner=ownerId(),device=selectedId(),isAdmin=state.access?.profile?.role==='admin';
     try{
@@ -220,6 +223,7 @@
     const found=state.devices.find(item=>String(item.id)===String(id));
     if(!found)return;
     state.selected=found;
+    state.equipmentRequestBlock=false;
     renderDeviceList();
     if(state.real)await loadSelectedData();
     else{
@@ -389,8 +393,9 @@
     setCheck('equipmentFullBlock',bool(e.launcher_full_block_enabled,false));
     const messages=messageMap();
     setInput('equipmentReturnMessage',messages.equipment_return?.message||MESSAGE_DEFINITIONS.find(x=>x.key==='equipment_return').message);
-    // Esta opção vale somente para a solicitação atual e nunca deve reaparecer marcada após atualizar.
-    setCheck('equipmentRequestBlock',false);
+    // Esta opção vale somente para a solicitação atual: inicia desmarcada ao carregar,
+    // mas permanece marcada enquanto o usuário prepara e confirma a devolução.
+    setCheck('equipmentRequestBlock',Boolean(state.equipmentRequestBlock));
     updateEquipmentControls();
     renderEquipmentStatus();
   }
@@ -401,7 +406,12 @@
     $('equipmentFullBlock').disabled=!ceded;
     if(!ceded)$('equipmentFullBlock').checked=false;
     $('equipmentRequestBlock').disabled=!ceded||!$('equipmentFullBlock').checked;
-    if($('equipmentRequestBlock').disabled)$('equipmentRequestBlock').checked=false;
+    if($('equipmentRequestBlock').disabled){
+      $('equipmentRequestBlock').checked=false;
+      state.equipmentRequestBlock=false;
+    }else{
+      $('equipmentRequestBlock').checked=Boolean(state.equipmentRequestBlock);
+    }
     $('equipmentModeBadge').textContent=equipmentLabel(mode);
   }
 
@@ -598,6 +608,7 @@
       if(state.real){await rpc('jc_launcher_request_equipment_return',{p_payload:{owner_id:ownerId(),device_id:selectedId(),message,block_launcher:wantsBlock}});await load();}
       else{state.config.equipment.return_required=true;state.config.equipment.status='return_requested';state.config.equipment.return_requested_at=new Date().toISOString();state.selected.blocked=wantsBlock;state.selected.block_reason=wantsBlock?'equipment_return':null;state.selected.block_message=wantsBlock?message:null;renderAll();}
       syncPreview(false,readBillingForm());
+      state.equipmentRequestBlock=false;
       toast(wantsBlock?'Devolução solicitada e bloqueio de equipamento registrado.':'Devolução solicitada sem bloqueio total.');
     }catch(error){toast(errorText(error),'error');}
     finally{loading(false);}
@@ -688,6 +699,9 @@
     $('addAppTargetBtn').addEventListener('click',addAppTarget);
     $('equipmentOwnership').addEventListener('change',updateEquipmentControls);
     $('equipmentFullBlock').addEventListener('change',updateEquipmentControls);
+    $('equipmentRequestBlock').addEventListener('change',()=>{
+      state.equipmentRequestBlock=$('equipmentRequestBlock').checked;
+    });
     $('saveEquipmentBtn').addEventListener('click',handleSaveEquipment);
     $('requestReturnBtn').addEventListener('click',requestReturn);
     $('markReturnedBtn').addEventListener('click',markReturned);

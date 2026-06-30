@@ -47,6 +47,20 @@
   function relativeTime(value){if(!value)return 'Nunca';const d=new Date(value);if(Number.isNaN(d.getTime()))return '—';const diff=Date.now()-d.getTime();if(diff<60000)return 'Agora';if(diff<3600000)return Math.max(1,Math.floor(diff/60000))+' min atrás';if(diff<86400000)return Math.max(1,Math.floor(diff/3600000))+' h atrás';return dateText(value);}
   function monthStart(){const d=new Date();return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1)).toISOString().slice(0,10);}
   function slug(value){return String(value||'app').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,45)||'app';}
+  function profileDisplayName(profile){return profile?.full_name||profile?.username||profile?.email||null;}
+  function ownerDisplayName(device){
+    const explicit=device?.owner_name||device?.owner_full_name||null;
+    if(explicit)return explicit;
+    const owner=String(device?.owner_id||'');
+    const current=state.access?.profile;
+    if(owner&&current&&String(current.id)===owner)return profileDisplayName(current)||'Administrador';
+    return owner?`Conta ${owner.slice(0,8)}`:'—';
+  }
+  function credentialStatusLabel(status){
+    const value=String(status||'').toLowerCase();
+    const map={active:'ATIVO',revoked:'TOKEN REVOGADO',expired:'TOKEN EXPIRADO'};
+    return map[value]||String(status||'ATIVO').toUpperCase();
+  }
   function ownerId(){return state.selected?.owner_id||state.access?.profile?.id||null;}
   function selectedId(){return state.selected?.id||null;}
   function errorText(error){
@@ -115,7 +129,7 @@
       result=await A.client.from('jc_launcher_devices').select('*').order('created_at',{ascending:false});
     }
     if(result.error)throw result.error;
-    return asArray(result.data).map(row=>{
+    const devices=asArray(result.data).map(row=>{
       const licenses=asArray(row.jc_launcher_licenses).slice().sort((a,b)=>new Date(b.created_at||b.expires_at||0)-new Date(a.created_at||a.expires_at||0));
       const license=licenses[0]||{};
       return Object.assign({},row,{
@@ -125,6 +139,19 @@
         license_expires_at:license.expires_at||row.license_expires_at||null
       });
     });
+
+    const ownerIds=[...new Set(devices.map(item=>item.owner_id).filter(Boolean))];
+    if(ownerIds.length){
+      const profiles=await A.client.from('profiles').select('id,full_name,username,email').in('id',ownerIds);
+      if(!profiles.error){
+        const byId=new Map(asArray(profiles.data).map(profile=>[String(profile.id),profileDisplayName(profile)]));
+        devices.forEach(device=>{device.owner_name=byId.get(String(device.owner_id))||device.owner_name||null;});
+      }else{
+        console.warn('Não foi possível carregar os nomes dos proprietários:',profiles.error);
+      }
+    }
+
+    return devices;
   }
 
   async function load(){
@@ -238,7 +265,7 @@
     $('detailModel').textContent=d.model||d.device_name||'Android TV';
     $('detailStatus').textContent=online?'ONLINE':'OFFLINE';
     $('detailStatus').className='pill '+(online?'online':'offline');
-    $('detailOwner').textContent='Proprietário: '+String(d.owner_id||'—');
+    $('detailOwner').textContent='Proprietário: '+ownerDisplayName(d);
     $('detailSeen').textContent=relativeTime(d.last_seen_at);
     $('detailAndroid').textContent=d.android_version||d.api_level||'—';
     $('detailLicense').textContent=String(d.license_status||'inactive').toLowerCase()==='active'?'Ativa':'Inativa';
@@ -264,7 +291,7 @@
     $('summaryCycleText').textContent=cycle?`${dateText(cycle.due_date)} • ${money(cycle.amount)}`:'Sem ciclo neste mês';
     $('summaryEquipment').textContent=equipmentLabel(equipment?.ownership_mode);
     $('summaryEquipmentText').textContent=equipment?.return_required?'Devolução solicitada':'Sem devolução pendente';
-    $('summarySync').textContent=state.tokenStatus?.configured?(credential?.status||'ATIVA').toUpperCase():'—';
+    $('summarySync').textContent=state.tokenStatus?.configured?credentialStatusLabel(credential?.status):'—';
     $('summarySyncText').textContent=state.tokenStatus?.configured?`Final ${credential?.token_last4||'—'} • último uso ${relativeTime(credential?.last_used_at)}`:'Credencial ainda não emitida';
   }
 

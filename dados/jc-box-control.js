@@ -61,6 +61,11 @@
     const map={active:'ATIVO',revoked:'TOKEN REVOGADO',expired:'TOKEN EXPIRADO'};
     return map[value]||String(status||'ATIVO').toUpperCase();
   }
+  function equipmentStatusLabel(status){
+    const value=String(status||'active').toLowerCase();
+    const map={active:'ATIVO',return_requested:'DEVOLUÇÃO SOLICITADA',returned:'DEVOLVIDO'};
+    return map[value]||String(status||'ATIVO').toUpperCase();
+  }
   function ownerId(){return state.selected?.owner_id||state.access?.profile?.id||null;}
   function selectedId(){return state.selected?.id||null;}
   function errorText(error){
@@ -384,7 +389,8 @@
     setCheck('equipmentFullBlock',bool(e.launcher_full_block_enabled,false));
     const messages=messageMap();
     setInput('equipmentReturnMessage',messages.equipment_return?.message||MESSAGE_DEFINITIONS.find(x=>x.key==='equipment_return').message);
-    setCheck('equipmentRequestBlock',bool(e.launcher_full_block_enabled,false));
+    // Esta opção vale somente para a solicitação atual e nunca deve reaparecer marcada após atualizar.
+    setCheck('equipmentRequestBlock',false);
     updateEquipmentControls();
     renderEquipmentStatus();
   }
@@ -403,10 +409,11 @@
     const e=state.config?.equipment||null;
     if(!e){$('equipmentStatusTitle').textContent='Equipamento ainda não cadastrado';$('equipmentStatusText').textContent='Salve o tipo de propriedade para liberar as ações de devolução.';$('equipmentStatusBadge').textContent='NÃO CADASTRADO';$('equipmentStatusBadge').className='pill info';$('requestReturnBtn').disabled=true;$('markReturnedBtn').disabled=true;return;}
     const returnPending=Boolean(e.return_required)&&!e.returned_at;
-    $('equipmentStatusTitle').textContent=`${equipmentLabel(e.ownership_mode)} • ${String(e.status||'active').toUpperCase()}`;
-    $('equipmentStatusText').textContent=returnPending?`Devolução solicitada em ${dateTime(e.return_requested_at)}${state.selected?.blocked?' • Launcher bloqueada':''}`:'Sem devolução pendente.';
-    $('equipmentStatusBadge').textContent=returnPending?'DEVOLUÇÃO PENDENTE':'ATIVO';
-    $('equipmentStatusBadge').className='pill '+(returnPending?'failed':'success');
+    const returned=String(e.status||'').toLowerCase()==='returned'||Boolean(e.returned_at);
+    $('equipmentStatusTitle').textContent=`${equipmentLabel(e.ownership_mode)} • ${equipmentStatusLabel(e.status)}`;
+    $('equipmentStatusText').textContent=returnPending?`Devolução solicitada em ${dateTime(e.return_requested_at)}${state.selected?.blocked?' • Launcher bloqueada':''}`:returned?`Equipamento devolvido em ${dateTime(e.returned_at)}.`:'Sem devolução pendente.';
+    $('equipmentStatusBadge').textContent=returnPending?'DEVOLUÇÃO PENDENTE':returned?'DEVOLVIDO':'ATIVO';
+    $('equipmentStatusBadge').className='pill '+(returnPending?'failed':returned?'info':'success');
     const ceded=e.ownership_mode==='rented'||e.ownership_mode==='loaned';
     $('requestReturnBtn').disabled=!ceded||returnPending;
     $('markReturnedBtn').disabled=!returnPending;

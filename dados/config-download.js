@@ -1,4 +1,4 @@
-/* JC-APK TV — Acesse Aqui 13C
+/* JC-APK TV — Acesse Aqui 13D
    Histórico detalhado, escolha ADM/cliente, limite diário e aviso de renomeação. */
 (function () {
   "use strict";
@@ -537,6 +537,9 @@
     }, true);
   }
 
+  // 13D: vincula imediatamente para garantir que o aviso de 10 segundos
+  // funcione mesmo se o evento jc:access-ready já tiver sido disparado.
+  bindCapture();
   document.addEventListener("jc:access-ready", bindCapture, { once: true });
   if (window.JC_GENERATOR_CONTEXT?.mode) bindCapture();
 

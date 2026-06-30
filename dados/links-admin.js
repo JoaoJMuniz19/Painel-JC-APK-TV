@@ -3,7 +3,7 @@
 
   const A = window.JC_APP;
   const $ = (id) => document.getElementById(id);
-  const state = { access: null, rows: [], definitions: [], scanFailed: false };
+  const state = { access: null, rows: [], definitions: [], scanFailed: false, accessHere: { defaultLimit: 20, exceptions: [], selectedClient: null, searchTimer: 0 } };
 
   const EMERGENCY_DEFINITIONS = [
     { id: "suporte_whatsapp", name: "Suporte WhatsApp", group: "Suporte", type: "link", sort: 10 },
@@ -48,6 +48,146 @@
   }
   function showModal(id) { const el = $(id); if (el) { el.classList.add("open"); el.setAttribute("aria-hidden", "false"); } }
   function closeModal(id) { const el = $(id); if (el) { el.classList.remove("open"); el.setAttribute("aria-hidden", "true"); } }
+
+
+  async function invokeAccessHere(body) {
+    const { data, error } = await A.client.functions.invoke("jc-download", { body });
+    if (error) {
+      let message = error?.message || "A função jc-download recusou a solicitação.";
+      try {
+        const context = error?.context;
+        if (context && typeof context.json === "function") {
+          const payload = await context.clone().json();
+          message = payload?.error || message;
+        } else if (context?.json?.error) message = context.json.error;
+      } catch (_) {}
+      throw new Error(message);
+    }
+    if (!data?.ok) throw new Error(data?.error || "Não foi possível carregar a configuração do Acesse Aqui.");
+    return data;
+  }
+
+  function usageText(item) {
+    if (item?.unlimited) return "Sem limite";
+    const used = Number(item?.used_today || 0);
+    const pending = Number(item?.pending_today || 0);
+    const limit = Number(item?.effective_limit || state.accessHere.defaultLimit || 20);
+    return pending ? `${used} confirmado(s) + ${pending} pendente(s) de ${limit}` : `${used} de ${limit} hoje`;
+  }
+
+  function renderAccessHereLimits() {
+    if (!$('accessDefaultLimit')) return;
+    $('accessDefaultLimit').value = String(state.accessHere.defaultLimit || 20);
+    const rows = state.accessHere.exceptions || [];
+    $('accessExceptionsCaption').textContent = rows.length
+      ? `${rows.length} cliente(s) com regra diferente do padrão.`
+      : 'Nenhuma exceção. Todos usam o limite padrão.';
+    $('accessExceptionsList').innerHTML = rows.length ? rows.map((item) => {
+      const rule = item.unlimited ? 'Sem limite' : `${Number(item.daily_limit || item.effective_limit || 20)} por dia`;
+      return `<div class="access-exception"><div><strong>${esc(item.client_name || item.username || 'Cliente')}</strong><small>@${esc(item.username || '')} · ${esc(usageText(item))}</small></div><b>${esc(rule)}</b></div>`;
+    }).join('') : '<div class="empty">Nenhum cliente foi alterado. Todos usam o padrão.</div>';
+  }
+
+  async function loadAccessHereLimits() {
+    try {
+      const data = await invokeAccessHere({ action: 'admin_get_limits' });
+      state.accessHere.defaultLimit = Number(data.default_daily_limit || 20);
+      state.accessHere.exceptions = data.exceptions || [];
+      renderAccessHereLimits();
+    } catch (error) {
+      console.warn('JC-APK: limites do Acesse Aqui não carregados.', error);
+      if ($('accessExceptionsList')) $('accessExceptionsList').innerHTML = `<div class="empty" style="color:#ffd5dc">${esc(error.message)}</div>`;
+      if ($('accessExceptionsCaption')) $('accessExceptionsCaption').textContent = 'Execute o SQL 13A e publique a jc-download atualizada.';
+    }
+  }
+
+  function selectedClientView(client) {
+    state.accessHere.selectedClient = client || null;
+    const box = $('accessSelectedClient');
+    if (!client) {
+      box?.classList.add('hidden');
+      return;
+    }
+    box.classList.remove('hidden');
+    $('accessSelectedName').textContent = client.display_name || client.full_name || client.username || 'Cliente';
+    $('accessSelectedMeta').textContent = `@${client.username || ''} · ${client.email || client.whatsapp || ''}`;
+    $('accessSelectedUsage').textContent = usageText(client);
+    const exception = (state.accessHere.exceptions || []).find((item) => item.client_id === client.id);
+    const mode = exception ? (exception.unlimited ? 'unlimited' : 'custom') : 'default';
+    $('accessClientMode').value = mode;
+    $('accessClientLimit').value = String(exception?.daily_limit || client.effective_limit || state.accessHere.defaultLimit || 20);
+    $('accessClientLimit').disabled = mode !== 'custom';
+  }
+
+  async function searchAccessClients() {
+    const term = $('accessClientSearch').value.trim();
+    if (term.length < 2) {
+      $('accessClientResults').innerHTML = '<div class="empty">Digite pelo menos 2 caracteres.</div>';
+      selectedClientView(null);
+      return;
+    }
+    $('accessClientResults').innerHTML = '<div class="empty">Pesquisando...</div>';
+    try {
+      const data = await invokeAccessHere({ action: 'admin_search_clients', search: term });
+      const clients = data.clients || [];
+      $('accessClientResults').innerHTML = clients.length ? clients.map((client) => `
+        <button type="button" class="access-client-result" data-access-client="${esc(client.id)}">
+          <div><strong>${esc(client.display_name || client.full_name || client.username || 'Cliente')}</strong><small>@${esc(client.username || '')} · ${esc(client.email || client.whatsapp || '')}</small></div>
+          <span>${esc(usageText(client))}</span>
+        </button>`).join('') : '<div class="empty">Nenhum cliente ativo encontrado.</div>';
+      $('accessClientResults').querySelectorAll('[data-access-client]').forEach((button) => {
+        button.addEventListener('click', () => selectedClientView(clients.find((item) => item.id === button.dataset.accessClient)));
+      });
+    } catch (error) {
+      $('accessClientResults').innerHTML = `<div class="empty" style="color:#ffd5dc">${esc(error.message)}</div>`;
+    }
+  }
+
+  function openAccessClientManager() {
+    $('accessClientSearch').value = '';
+    $('accessClientResults').innerHTML = '<div class="empty">Pesquise um cliente para configurar.</div>';
+    selectedClientView(null);
+    showModal('accessClientsModal');
+    setTimeout(() => $('accessClientSearch')?.focus(), 80);
+  }
+
+  async function saveAccessDefault() {
+    const dailyLimit = Number($('accessDefaultLimit').value || 0);
+    if (!Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 10000) throw new Error('Informe um limite padrão entre 1 e 10000.');
+    await invokeAccessHere({ action: 'admin_save_default_limit', daily_limit: dailyLimit });
+    state.accessHere.defaultLimit = dailyLimit;
+    toast('Limite padrão do Acesse Aqui salvo.');
+    await loadAccessHereLimits();
+  }
+
+  async function saveAccessClient() {
+    const client = state.accessHere.selectedClient;
+    if (!client?.id) throw new Error('Selecione um cliente.');
+    const mode = $('accessClientMode').value;
+    if (mode === 'default') {
+      await invokeAccessHere({ action: 'admin_delete_client_limit', client_id: client.id });
+      toast('Cliente voltou a usar o limite padrão.');
+    } else if (mode === 'unlimited') {
+      await invokeAccessHere({ action: 'admin_save_client_limit', client_id: client.id, unlimited: true });
+      toast('Cliente configurado sem limite diário.');
+    } else {
+      const dailyLimit = Number($('accessClientLimit').value || 0);
+      if (!Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 10000) throw new Error('Informe um limite personalizado entre 1 e 10000.');
+      await invokeAccessHere({ action: 'admin_save_client_limit', client_id: client.id, unlimited: false, daily_limit: dailyLimit });
+      toast('Limite personalizado salvo para o cliente.');
+    }
+    await loadAccessHereLimits();
+    await searchAccessClients();
+  }
+
+  async function revertAccessClient() {
+    const client = state.accessHere.selectedClient;
+    if (!client?.id) throw new Error('Selecione um cliente.');
+    await invokeAccessHere({ action: 'admin_delete_client_limit', client_id: client.id });
+    toast('Cliente voltou a usar o limite padrão.');
+    await loadAccessHereLimits();
+    await searchAccessClients();
+  }
 
   function itemsOf(row) {
     if (!row) return [];
@@ -187,6 +327,7 @@
       await fetchRows();
       state.definitions = await readHtmlDefinitions();
     }
+    await loadAccessHereLimits();
     renderAll();
   }
 
@@ -409,6 +550,17 @@
     finally { $("syncButtonsBtn").disabled = false; }
   });
   $("reloadBtn").addEventListener("click", () => loadAll(false).then(() => toast("Dados atualizados.")).catch((error) => toast(error.message, "error")));
+  $("saveAccessDefaultBtn")?.addEventListener("click", () => saveAccessDefault().catch((error) => toast(error.message, "error")));
+  $("manageAccessClientsBtn")?.addEventListener("click", openAccessClientManager);
+  $("accessClientSearchBtn")?.addEventListener("click", searchAccessClients);
+  $("accessClientSearch")?.addEventListener("input", () => {
+    clearTimeout(state.accessHere.searchTimer);
+    state.accessHere.searchTimer = setTimeout(searchAccessClients, 350);
+  });
+  $("accessClientSearch")?.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); searchAccessClients(); } });
+  $("accessClientMode")?.addEventListener("change", () => { $("accessClientLimit").disabled = $("accessClientMode").value !== "custom"; });
+  $("accessSaveClientBtn")?.addEventListener("click", () => saveAccessClient().catch((error) => toast(error.message, "error")));
+  $("accessRevertClientBtn")?.addEventListener("click", () => revertAccessClient().catch((error) => toast(error.message, "error")));
 
   // Recursos antigos de opções separadas deixam de criar linhas paralelas.
   $("newOtherLinkBtn")?.classList.add("hidden");

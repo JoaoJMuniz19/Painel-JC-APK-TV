@@ -23,6 +23,8 @@
     .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.tile{position:relative;padding:15px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.018));min-height:150px;display:flex;flex-direction:column;gap:10px}.tile:hover{border-color:rgba(86,190,255,.40)}.tile-title{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.tile h5{margin:0;font-size:16px}.tile .tag{white-space:nowrap;padding:5px 8px;border-radius:999px;background:rgba(43,211,145,.10);border:1px solid rgba(43,211,145,.25);color:#baffdc;font-size:10px;font-weight:900;text-transform:uppercase}.tile .desc{color:var(--muted);font-size:12px;line-height:1.45;overflow-wrap:anywhere}.tile .meta{display:flex;gap:7px;flex-wrap:wrap}.pill{padding:5px 8px;border-radius:999px;background:rgba(39,143,255,.10);border:1px solid rgba(39,143,255,.22);font-size:10px;color:#cde9ff}.tile-actions{margin-top:auto;display:flex;gap:7px;flex-wrap:wrap}.tile-actions .btn{padding:8px 10px;font-size:11px}.empty{padding:24px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:15px}
     .modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.78);backdrop-filter:blur(9px)}.modal.open{display:flex}.modal-box{width:min(720px,100%);max-height:94vh;overflow:auto;border:1px solid var(--line);border-radius:22px;background:#091a29;box-shadow:0 32px 100px rgba(0,0,0,.62)}.modal-head,.modal-foot{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:15px 18px;border-bottom:1px solid var(--line)}.modal-head h3{margin:0}.modal-foot{justify-content:flex-end;border-top:1px solid var(--line);border-bottom:0}.modal-body{padding:18px}.option-list{display:grid;gap:10px}.option-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025)}.option-row strong{display:block}.option-row small{color:var(--muted)}.option-actions{display:flex;gap:6px;flex-wrap:wrap}.option-actions .btn{padding:7px 9px;font-size:10px}
     .mode-help{padding:11px 12px;border:1px solid rgba(39,143,255,.23);border-radius:12px;background:rgba(39,143,255,.07);color:#d4ecff;font-size:12px;line-height:1.5}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.toolbar input{flex:1;min-width:220px;padding:11px;border-radius:11px;border:1px solid var(--line);background:#061522;color:#fff}
+
+    .access-limit-layout{display:grid;grid-template-columns:minmax(220px,320px) 1fr;gap:16px;align-items:start}.access-limit-control{padding:16px;border:1px solid rgba(54,225,141,.25);border-radius:16px;background:rgba(54,225,141,.06)}.access-limit-control label{display:block;margin-bottom:7px;color:#cde9dd;font-size:12px;font-weight:800}.access-limit-row{display:flex;gap:8px;align-items:center}.access-limit-row input{width:110px;padding:12px;border-radius:11px;border:1px solid var(--line);background:#061522;color:#fff;font-size:18px;font-weight:900}.access-limit-note{margin-top:9px;color:var(--muted);font-size:12px;line-height:1.45}.access-exceptions{display:grid;gap:9px}.access-exception{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 13px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.025)}.access-exception strong,.access-exception small{display:block}.access-exception small{margin-top:3px;color:var(--muted)}.access-exception b{white-space:nowrap;color:#c8edff}.access-client-results{display:grid;gap:8px;margin-top:12px}.access-client-result{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;padding:12px;border:1px solid rgba(39,143,255,.28);border-radius:13px;background:rgba(39,143,255,.09);color:#fff;text-align:left;cursor:pointer}.access-client-result:hover{background:rgba(39,143,255,.17)}.access-client-result strong,.access-client-result small{display:block}.access-client-result small{margin-top:3px;color:var(--muted)}.access-client-result span{white-space:nowrap;font-size:11px;color:#cceaff}.access-selected{margin-top:14px;padding:14px;border:1px solid rgba(54,225,141,.3);border-radius:15px;background:rgba(54,225,141,.06)}.access-selected-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.access-selected-head small{display:block;margin-top:4px;color:var(--muted)}.access-limit-mode{display:grid;grid-template-columns:1fr 150px;gap:10px;margin-top:13px}.access-limit-mode select,.access-limit-mode input{padding:12px;border-radius:11px;border:1px solid var(--line);background:#061522;color:#fff}.access-selected-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:13px}@media(max-width:720px){.access-limit-layout{grid-template-columns:1fr}.access-limit-row{align-items:stretch;flex-direction:column}.access-limit-row input{width:100%;box-sizing:border-box}.access-exception,.access-client-result,.access-selected-head{align-items:flex-start;flex-direction:column}.access-limit-mode{grid-template-columns:1fr}}
     @media(max-width:1080px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.wrap{padding:10px}.top,.hero,.section-head{flex-direction:column;align-items:flex-start}.actions{width:100%}.actions .btn{flex:1}.grid{grid-template-columns:1fr}.tile{min-height:auto}.option-row{align-items:flex-start;flex-direction:column}}
   </style>
 <link rel="stylesheet" href="dados/launcher-module.css?v=20260629-12A">
@@ -57,6 +59,19 @@
 
     <section class="notice"><strong>Separação protegida:</strong> os códigos principais de ativação de 11 e 16 dígitos continuam na lógica própria deles. Aqui entram apenas códigos dos pequenos quadros de download, links dos botões, JC Launcher Lite/Pro e links auxiliares.</section>
 
+
+    <section class="card section" id="accessHereLimitSection">
+      <div class="section-head"><div><h3>🌐 Limite do Acesse Aqui</h3><p>O padrão vale automaticamente para todos. Somente os clientes alterados ficam na lista de exceções.</p></div><button id="manageAccessClientsBtn" class="btn blue" type="button">Gerenciar clientes</button></div>
+      <div class="section-body access-limit-layout">
+        <div class="access-limit-control">
+          <label for="accessDefaultLimit">Limite padrão diário</label>
+          <div class="access-limit-row"><input id="accessDefaultLimit" type="number" min="1" max="10000" value="20"><button id="saveAccessDefaultBtn" class="btn green" type="button">Salvar padrão</button></div>
+          <div class="access-limit-note">Downloads confirmados pelo cliente ou feitos pelo ADM para ele entram na contagem. Download como ADM não contabiliza.</div>
+        </div>
+        <div><div class="subhead"><h4>Exceções configuradas</h4><small id="accessExceptionsCaption">Carregando...</small></div><div id="accessExceptionsList" class="access-exceptions"><div class="empty">Carregando limites...</div></div></div>
+      </div>
+    </section>
+
     <section class="card section">
       <div class="section-head"><div><h3>🔐 Códigos de download</h3><p>Todos os grupos de códigos usam a mesma regra: números simples entram em rotação aleatória e mostram apenas um por clique; “Nome | Código” cria opções como VOD, LIVE ou versões.</p></div></div>
       <div class="section-body">
@@ -77,6 +92,22 @@
       <div class="section-body"><div id="otherLinksGrid" class="grid"></div></div>
     </section>
   </main>
+</div>
+
+
+<div id="accessClientsModal" class="modal" aria-hidden="true">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="accessClientsTitle">
+    <div class="modal-head"><div><h3 id="accessClientsTitle">Gerenciar limites por cliente</h3><small class="muted">Pesquise sem carregar uma lista enorme de clientes.</small></div><button class="btn red" data-close="accessClientsModal">Fechar</button></div>
+    <div class="modal-body">
+      <div class="toolbar"><input id="accessClientSearch" type="search" autocomplete="off" placeholder="Nome, usuário, e-mail ou WhatsApp"><button id="accessClientSearchBtn" class="btn blue" type="button">Pesquisar</button></div>
+      <div id="accessClientResults" class="access-client-results"><div class="empty">Pesquise um cliente para configurar.</div></div>
+      <div id="accessSelectedClient" class="access-selected hidden">
+        <div class="access-selected-head"><div><strong id="accessSelectedName">Cliente</strong><small id="accessSelectedMeta"></small></div><b id="accessSelectedUsage">0 de 20 hoje</b></div>
+        <div class="access-limit-mode"><select id="accessClientMode"><option value="default">Usar limite padrão</option><option value="custom">Limite personalizado</option><option value="unlimited">Sem limite</option></select><input id="accessClientLimit" type="number" min="1" max="10000" value="20" aria-label="Limite personalizado"></div>
+        <div class="access-selected-actions"><button id="accessRevertClientBtn" class="btn ghost" type="button">Voltar ao padrão</button><button id="accessSaveClientBtn" class="btn green" type="button">Salvar cliente</button></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="editorModal" class="modal" aria-hidden="true">
@@ -118,6 +149,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="dados/supabase-config.js"></script>
 <script src="dados/common.js"></script>
-<script src="dados/links-admin.js?v=20260628-11C16"></script>
+<script src="dados/links-admin.js?v=20260630-13A"></script>
 </body>
 </html>

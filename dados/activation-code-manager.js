@@ -1,13 +1,14 @@
 /* =====================================================================
    JC-APK TV — Atualização 11
    Gerenciador de Ativadores, aparelhos, .config e relatório do Acesse Aqui
-   Edge Function: jc-activate 11B-01-GERENCIAMENTO-COMPLETO
+   Edge Functions: jc-activate + jc-download 13A
    ===================================================================== */
 (function(){
   'use strict';
 
   const A=window.JC_APP;
   const EDGE_FUNCTION='jc-activate';
+  const DOWNLOAD_EDGE_FUNCTION='jc-download';
   const ACTIONS={
     list:'admin_list_codes', device:'admin_get_code_device', history:'admin_get_code_history',
     configs:'admin_list_config_usage', recount:'admin_recount_configs',
@@ -45,6 +46,17 @@
     const {data,error}=await A.client.functions.invoke(EDGE_FUNCTION,{body:{action,...payload}});
     if(error) throw new Error(error.message||'Falha ao chamar a Edge Function.');
     if(!data?.ok) throw new Error(data?.reason||data?.error||'A operação não foi concluída.');
+    return data;
+  }
+  async function invokeDownload(action,payload={}){
+    if(!A?.client) throw new Error('Supabase não configurado em dados/supabase-config.js.');
+    const {data,error}=await A.client.functions.invoke(DOWNLOAD_EDGE_FUNCTION,{body:{action,...payload}});
+    if(error){
+      let message=error.message||'Falha ao chamar a Edge Function jc-download.';
+      try{const context=error?.context;if(context&&typeof context.json==='function'){const body=await context.clone().json();message=body?.error||message;}else if(context?.json?.error) message=context.json.error;}catch(_){}
+      throw new Error(message);
+    }
+    if(!data?.ok) throw new Error(data?.error||'A operação não foi concluída.');
     return data;
   }
   function filters(){
@@ -220,39 +232,46 @@
   }
 
 
-  function normalizeOrigin(value){
-    return String(value||'outro').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\s-]+/g,'_');
+  function accessUsage(item){
+    if(item.download_mode==='admin'||item.unlimited_at_time) return item.download_mode==='admin'?'Não contabiliza':'Sem limite';
+    const limit=Number(item.daily_limit_at_time||0);
+    if(!limit) return 'Padrão atual';
+    const position=Number(item.used_after??(Number(item.used_before||0)+(item.status==='confirmed'?1:0)));
+    return `${position} de ${limit}`;
   }
-  function isAccessHereOrigin(value){
-    const origin=normalizeOrigin(value);
-    return origin.includes('acesse_aqui')||origin.includes('acesso_aqui')||origin.includes('config_individual')||origin.includes('config_access')||origin.includes('acessar_aqui');
-  }
-  function renderAccessHere(){
+  function renderAccessHere(data){
     if(!isAdmin()) return;
-    const records=[];
-    (state.configs||[]).forEach(config=>{
-      (config.details||[]).forEach(delivery=>{
-        if(isAccessHereOrigin(delivery.origin)) records.push({...delivery,config_label:config.config_label,version_label:config.version_label});
-      });
-    });
-    records.sort((a,b)=>new Date(b.confirmed_at||b.reserved_at||0).getTime()-new Date(a.confirmed_at||a.reserved_at||0).getTime());
-    const confirmed=records.filter(item=>['confirmed','used','delivered'].includes(String(item.status||'').toLowerCase())).length;
-    const reserved=records.filter(item=>String(item.status||'').toLowerCase()==='reserved').length;
-    const cancelled=records.filter(item=>['cancelled','released','failed'].includes(String(item.status||'').toLowerCase())).length;
-    const clients=new Set(records.map(item=>String(item.client_id||item.client_name||'')).filter(Boolean)).size;
-    $('acmAccessHereSummary').innerHTML=`${detail('Total de acessos',records.length)}${detail('Confirmados',confirmed)}${detail('Reservados',reserved)}${detail('Cancelados/erros',cancelled)}${detail('Responsáveis',clients)}`;
-    $('acmAccessHereList').innerHTML=records.length?records.map(item=>`<article class="acm-config-card">
-      <div class="acm-config-head"><div><h4>${esc(item.config_label||'CONFIG')} / ${esc(item.version_label||'—')}</h4><small>${esc(item.client_name||'Não vinculado')}</small></div>${pill(item.status)}</div>
-      <div class="acm-config-metrics">${detail('Origem',item.origin||'Acesse Aqui')}${detail('Aparelho',item.device_id||'—')}${detail('Reserva',formatDate(item.reserved_at))}${detail('Confirmação',formatDate(item.confirmed_at))}</div>
-    </article>`).join(''):'<div class="acm-empty">Ainda não há entregas identificadas como Acesse Aqui.</div>';
+    const records=data.history||[];
+    const summary=data.summary||{};
+    $('acmAccessHereSummary').innerHTML=`${detail('Total de acessos',summary.total||0)}${detail('Confirmados',summary.confirmed||0)}${detail('Reservados',summary.reserved||0)}${detail('Cancelados/erros',summary.cancelled||0)}${detail('Clientes',summary.clients||0)}${detail('Como ADM',summary.admin||0)}`;
+    $('acmAccessHereList').innerHTML=records.length?records.map(item=>{
+      const target=item.download_mode==='admin'?'ADM — sem contabilizar':(item.target_client_name||'Não vinculado');
+      const actor=item.legacy_record?'Registro antigo — autor não identificado':(item.actor_name||'Não identificado');
+      const device=item.device_label||[item.platform_label,item.browser_label].filter(Boolean).join(' / ')||item.device_key||'Não informado';
+      const error=item.error_message?`<div class="acm-empty acm-text-danger" style="margin-top:10px">${esc(item.error_message)}</div>`:'';
+      return `<article class="acm-config-card">
+        <div class="acm-config-head"><div><h4>${esc(item.config_label||'CONFIG')} / ${esc(item.version_label||'—')}</h4><small>${esc(target)}</small></div>${pill(item.status)}</div>
+        <div class="acm-config-metrics">
+          ${detail('Baixado para',target)}
+          ${detail('Baixado por',actor)}
+          ${detail('Tipo',item.download_mode==='admin'?'ADM':'Cliente')}
+          ${detail('Uso diário',accessUsage(item))}
+          ${detail('Dispositivo do download',device)}
+          ${detail('Sistema',item.platform_label||'—')}
+          ${detail('Navegador',item.browser_label||'—')}
+          ${detail('Reserva',formatDate(item.reserved_at||item.created_at))}
+          ${detail('Confirmação',formatDate(item.confirmed_at))}
+        </div>${error}
+      </article>`;
+    }).join(''):'<div class="acm-empty">Ainda não há downloads registrados pelo Acesse Aqui.</div>';
     state.accessHereLoaded=true;
   }
   async function loadAccessHere(){
     if(!isAdmin()) return;
-    $('acmAccessHereList').innerHTML='<div class="acm-loading">Carregando relatório do Acesse Aqui...</div>';
+    $('acmAccessHereList').innerHTML='<div class="acm-loading">Carregando relatório detalhado do Acesse Aqui...</div>';
     try{
-      if(!state.configsLoaded) await loadConfigs();
-      renderAccessHere();
+      const data=await invokeDownload('admin_list_history',{limit:1000,search:$('acmAccessHereSearch')?.value.trim()||'',status:$('acmAccessHereStatus')?.value||'',download_mode:$('acmAccessHereMode')?.value||''});
+      renderAccessHere(data);
     }catch(error){$('acmAccessHereList').innerHTML=`<div class="acm-empty acm-text-danger">${esc(error.message)}</div>`;}
   }
 
@@ -278,7 +297,7 @@
     state.bound=true;
     $('acmRetryBtn').addEventListener('click',loadCodes);$('acmReloadBtn').addEventListener('click',loadCodes);$('acmFilterBtn').addEventListener('click',loadCodes);
     $('acmReloadConfigsBtn').addEventListener('click',loadConfigs);$('acmRecountConfigsBtn').addEventListener('click',recountConfigs);
-    $('acmReloadAccessHereBtn').addEventListener('click',loadAccessHere);
+    $('acmReloadAccessHereBtn').addEventListener('click',loadAccessHere);$('acmFilterAccessHereBtn')?.addEventListener('click',loadAccessHere);$('acmAccessHereSearch')?.addEventListener('keydown',event=>{if(event.key==='Enter') loadAccessHere();});
     $('acmModalClose').addEventListener('click',()=>$('acmModal').classList.remove('show'));$('acmModal').addEventListener('click',event=>{if(event.target===$('acmModal')) $('acmModal').classList.remove('show');});
     document.querySelectorAll('.acm-type-btn').forEach(btn=>btn.addEventListener('click',()=>{state.codeType=btn.dataset.codeType||'';document.querySelectorAll('.acm-type-btn').forEach(item=>item.classList.toggle('active',item===btn));loadCodes();}));
     document.querySelectorAll('.acm-view-btn').forEach(btn=>btn.addEventListener('click',()=>switchView(btn.dataset.view)));

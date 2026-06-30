@@ -41,7 +41,7 @@
             <span class="acm-tag">⏳ Validade de 3 dias</span>
             <span class="acm-tag">📺 Aparelho detalhado</span>
             <span class="acm-tag">🌐 Acesse Aqui</span>
-            <span class="acm-tag">☁️ jc-activate 11B-01</span>
+            <span class="acm-tag">☁️ jc-activate + jc-download 13A</span>
           </div>
         </div>
       </section>
@@ -136,9 +136,15 @@
           <div class="acm-card-head">
             <div>
               <h3>Relatório do Acesse Aqui — somente ADM</h3>
-              <p>Entregas de .config originadas pelo botão Acesse Aqui, com versão, responsável, aparelho, data e status.</p>
+              <p>Downloads do Acesse Aqui com cliente, quem realizou, dispositivo/navegador usado, versão, limite diário, data e status. O dispositivo exibido é o usado para baixar, não a TV Box onde foi instalado.</p>
             </div>
             <button id="acmReloadAccessHereBtn" class="acm-btn primary" type="button">↻ Atualizar Acesse Aqui</button>
+          </div>
+          <div class="acm-filters" style="margin-bottom:16px">
+            <div class="acm-field"><label for="acmAccessHereSearch">Cliente, autor ou dispositivo</label><input id="acmAccessHereSearch" placeholder="Nome, usuário, aparelho ou navegador"></div>
+            <div class="acm-field"><label for="acmAccessHereStatus">Status</label><select id="acmAccessHereStatus"><option value="">Todos</option><option value="confirmed">Confirmado</option><option value="reserved">Reservado</option><option value="cancelled">Cancelado</option><option value="failed">Falhou</option></select></div>
+            <div class="acm-field"><label for="acmAccessHereMode">Tipo</label><select id="acmAccessHereMode"><option value="">Todos</option><option value="client">Cliente</option><option value="admin">ADM sem contabilizar</option></select></div>
+            <button id="acmFilterAccessHereBtn" class="acm-btn primary" type="button">Filtrar</button>
           </div>
           <div id="acmAccessHereSummary" class="acm-config-summary"></div>
           <div id="acmAccessHereList" class="acm-config-list"><div class="acm-empty">Abra esta área para carregar o relatório do Acesse Aqui.</div></div>
@@ -157,7 +163,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="dados/supabase-config.js"></script>
   <script src="dados/common.js"></script>
-  <script src="dados/activation-code-manager.js?v=20260627-11C07"></script>
+  <script src="dados/activation-code-manager.js?v=20260630-13A"></script>
   <script src="dados/admin-gate.js" data-title="Ativadores e .Config — Atualização 11" data-description="Entre com sua conta para acessar códigos, aparelhos, .config e históricos permitidos ao seu nível." data-roles="admin,client" data-back-url="painel-relatorios.html" data-back-label="← Voltar ao JC Relatórios"></script>
 </body>
 </html>

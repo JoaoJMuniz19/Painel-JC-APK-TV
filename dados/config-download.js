@@ -1,6 +1,5 @@
-/* JC-APK TV — Acesse Aqui 13B
-   Histórico detalhado, escolha ADM/cliente e limite diário por cliente.
-   Não usa IP e não altera a regra dos vencidos há 3 dias. */
+/* JC-APK TV — Acesse Aqui 13C
+   Histórico detalhado, escolha ADM/cliente, limite diário e aviso de renomeação. */
 (function () {
   "use strict";
 
@@ -284,17 +283,101 @@
     }
   }
 
-  function startSignedDownload(signedUrl) {
-    // Não usa Blob nem o atributo download: alguns navegadores removem o ponto
-    // inicial e salvam como "config". O link assinado já vem do Supabase com
-    // Content-Disposition para entregar o nome exato ".config".
+  function startNamedDownload(blob, signedUrl, fileName) {
+    const safeName = String(fileName || "JC.config").replace(/[^A-Za-z0-9._-]/g, "") || "JC.config";
     const link = document.createElement("a");
-    link.href = String(signedUrl || "");
+    let objectUrl = "";
+    try {
+      objectUrl = URL.createObjectURL(blob);
+      link.href = objectUrl;
+      link.download = safeName;
+    } catch (_) {
+      link.href = String(signedUrl || "");
+    }
     link.rel = "noopener";
     link.style.display = "none";
     document.body.appendChild(link);
     link.click();
-    window.setTimeout(() => link.remove(), 1500);
+    window.setTimeout(() => {
+      link.remove();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    }, 3000);
+  }
+
+  function showRenameNotice(fileName) {
+    return new Promise((resolve) => {
+      const old = document.getElementById("jc_config_rename_notice");
+      if (old) old.remove();
+
+      const modal = document.createElement("div");
+      modal.id = "jc_config_rename_notice";
+      modal.innerHTML = `
+        <div class="jc-config-notice-box" role="dialog" aria-modal="true" aria-labelledby="jc_config_notice_title">
+          <div class="jc-config-notice-icon">⚠️</div>
+          <h3 id="jc_config_notice_title">Atenção antes de usar o arquivo</h3>
+          <p>O arquivo será baixado como <strong>${escapeHtml(fileName)}</strong>.</p>
+          <div class="jc-config-rename-rule">Depois de baixar, renomeie e deixe somente <strong>.config</strong> para poder utilizar.</div>
+          <p class="jc-config-notice-help">Altere apenas o nome. Não abra nem edite o conteúdo do arquivo.</p>
+          <div class="jc-config-notice-actions">
+            <button type="button" class="jc-config-notice-cancel">Cancelar</button>
+            <button type="button" class="jc-config-notice-download" disabled>Baixar em 10 segundos</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+
+      if (!document.getElementById("jc_config_rename_notice_styles")) {
+        const style = document.createElement("style");
+        style.id = "jc_config_rename_notice_styles";
+        style.textContent = `
+          #jc_config_rename_notice{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.82);backdrop-filter:blur(8px)}
+          .jc-config-notice-box{width:min(520px,96vw);padding:24px;border-radius:24px;background:linear-gradient(145deg,#0b1723,#03080e);border:1px solid rgba(255,190,61,.48);box-shadow:0 30px 90px rgba(0,0,0,.7);color:#fff;text-align:center;font-family:Arial,sans-serif}
+          .jc-config-notice-icon{font-size:42px;line-height:1;margin-bottom:8px}
+          .jc-config-notice-box h3{margin:0 0 12px;font-size:23px}
+          .jc-config-notice-box p{margin:8px 0;color:#c1d0d9;line-height:1.5}
+          .jc-config-notice-box p strong{color:#fff;font-size:17px}
+          .jc-config-rename-rule{margin:16px 0;padding:15px;border-radius:15px;background:rgba(255,179,33,.12);border:1px solid rgba(255,190,61,.34);color:#ffe5aa;line-height:1.5}
+          .jc-config-rename-rule strong{display:inline-block;padding:2px 7px;border-radius:7px;background:#fff;color:#08111a;font-size:18px}
+          .jc-config-notice-help{font-size:13px!important;color:#91a8b6!important}
+          .jc-config-notice-actions{display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin-top:20px}
+          .jc-config-notice-actions button{min-height:48px;border:0;border-radius:13px;font-weight:800;cursor:pointer}
+          .jc-config-notice-cancel{background:rgba(255,255,255,.11);color:#fff}
+          .jc-config-notice-download{background:linear-gradient(135deg,#13a664,#19c77b);color:#03120b}
+          .jc-config-notice-download:disabled{cursor:not-allowed;opacity:.55;filter:grayscale(.25)}
+          @media(max-width:520px){.jc-config-notice-actions{grid-template-columns:1fr}.jc-config-notice-box{padding:20px}}`;
+        document.head.appendChild(style);
+      }
+
+      const cancel = modal.querySelector(".jc-config-notice-cancel");
+      const download = modal.querySelector(".jc-config-notice-download");
+      let seconds = 10;
+      let finished = false;
+      let timer = 0;
+
+      const finish = (value) => {
+        if (finished) return;
+        finished = true;
+        if (timer) window.clearInterval(timer);
+        modal.remove();
+        resolve(Boolean(value));
+      };
+
+      cancel.onclick = () => finish(false);
+      modal.onclick = (event) => { if (event.target === modal) finish(false); };
+      download.onclick = () => { if (!download.disabled) finish(true); };
+
+      timer = window.setInterval(() => {
+        seconds -= 1;
+        if (seconds > 0) {
+          download.textContent = `Baixar em ${seconds} segundo${seconds === 1 ? "" : "s"}`;
+          return;
+        }
+        window.clearInterval(timer);
+        timer = 0;
+        download.disabled = false;
+        download.textContent = "Baixar arquivo";
+        download.focus();
+      }, 1000);
+    });
   }
 
   function report(detail) {
@@ -349,13 +432,26 @@
       historyId = reserved.history_id || "";
 
       if (!reserved.signed_url) throw new Error("O Supabase não retornou o link temporário da CONFIG.");
+      const fileName = String(reserved.file_name || (destination.download_mode === "admin" ? "JC.config" : "CL.config"));
+      const approved = await showRenameNotice(fileName);
+      if (!approved) {
+        await invoke({
+          action: "cancel",
+          history_id: historyId,
+          failed: false,
+          error_message: "Download cancelado antes da liberação do arquivo.",
+        });
+        historyId = "";
+        return false;
+      }
+
       const response = await fetch(reserved.signed_url, { cache: "no-store" });
       if (!response.ok) throw new Error("O arquivo privado não pôde ser baixado. Código " + response.status + ".");
       const blob = await response.blob();
       if (!blob || blob.size < 1) throw new Error("O arquivo recebido está vazio.");
 
       const confirmation = await invoke({ action: "confirm", history_id: historyId });
-      startSignedDownload(reserved.signed_url);
+      startNamedDownload(blob, reserved.signed_url, fileName);
 
       report({
         function_id: "config.access",
@@ -372,6 +468,7 @@
           target_client_id: destination.target_client_id || null,
           device_label: device.device_label,
           source: "jc-download",
+          file_name: String(reserved.file_name || ""),
         },
       });
 

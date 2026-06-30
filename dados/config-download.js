@@ -1,4 +1,4 @@
-/* JC-APK TV — Acesse Aqui 13A
+/* JC-APK TV — Acesse Aqui 13B
    Histórico detalhado, escolha ADM/cliente e limite diário por cliente.
    Não usa IP e não altera a regra dos vencidos há 3 dias. */
 (function () {
@@ -8,7 +8,7 @@
   let busy = false;
   let captureBound = false;
   let pickerResolver = null;
-  let pickerTimer = 0;
+  let pickerClients = [];
 
   function app() {
     if (!A?.client) throw new Error("A conexão com o Supabase ainda não foi preparada.");
@@ -122,6 +122,65 @@
     if (typeof resolver === "function") resolver(value || null);
   }
 
+  function clientSearchText(client) {
+    return [
+      client?.display_name,
+      client?.full_name,
+      client?.username,
+      client?.email,
+      client?.whatsapp,
+      client?.whatsapp2,
+      client?.whatsapp3,
+    ].filter(Boolean).join(" ").toLocaleLowerCase("pt-BR");
+  }
+
+  function clientUsageText(client) {
+    if (client?.unlimited) return "Sem limite diário";
+    const used = Number(client?.used_today || 0);
+    const limit = Number(client?.effective_limit || 20);
+    return `${used} de ${limit} hoje`;
+  }
+
+  function renderDestinationClients(term = "") {
+    const list = document.getElementById("jc_config_client_list");
+    if (!list) return;
+
+    const query = String(term || "").trim().toLocaleLowerCase("pt-BR");
+    const showDirect = "venda direta meu suporte jc apk tv adm".includes(query);
+    const clients = pickerClients.filter((client) => !query || clientSearchText(client).includes(query));
+    list.innerHTML = "";
+
+    if (showDirect) {
+      const directButton = document.createElement("button");
+      directButton.type = "button";
+      directButton.className = "jc-config-client-option jc-direct-sale";
+      directButton.innerHTML = `<strong>🏠 Venda direta JC APK TV — Meu suporte</strong><span>Baixa como ADM, não contabiliza no limite diário e não consome a CONFIG.</span>`;
+      directButton.onclick = () => closeDestinationPicker({
+        download_mode: "admin",
+        target_client_id: null,
+        target_name: "Venda direta JC APK TV",
+      });
+      list.appendChild(directButton);
+    }
+
+    clients.forEach((client) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "jc-config-client-option";
+      button.innerHTML = `<strong>${escapeHtml(client.display_name || client.full_name || client.username || "Cliente")}</strong><span>@${escapeHtml(client.username || "")} · ${escapeHtml(client.email || client.whatsapp || "")} · ${escapeHtml(clientUsageText(client))}</span>`;
+      button.onclick = () => closeDestinationPicker({
+        download_mode: "client",
+        target_client_id: client.id,
+        target_name: client.display_name || client.full_name || client.username || "Cliente",
+      });
+      list.appendChild(button);
+    });
+
+    if (!showDirect && !clients.length) {
+      list.innerHTML = '<div class="jc-config-client-loading">Nenhum responsável encontrado.</div>';
+    }
+  }
+
   function ensureDestinationPicker() {
     let modal = document.getElementById("jc_config_destination_picker");
     if (modal) return modal;
@@ -129,102 +188,81 @@
     modal = document.createElement("div");
     modal.id = "jc_config_destination_picker";
     modal.innerHTML = `
-      <div class="jc-config-destination-box" role="dialog" aria-modal="true" aria-labelledby="jc_config_destination_title">
-        <div class="jc-config-destination-head">
+      <div class="jc-config-client-box" role="dialog" aria-modal="true" aria-labelledby="jc_config_destination_title">
+        <div class="jc-config-client-head">
           <div>
-            <h3 id="jc_config_destination_title">Como deseja baixar?</h3>
-            <p>Como ADM não contabiliza. Para cliente, o download entra no limite diário dele.</p>
+            <h3 id="jc_config_destination_title">Escolha o responsável pelo download</h3>
+            <p>Venda direta baixa como ADM. Para cliente, escolha o responsável pelo arquivo.</p>
           </div>
           <button type="button" id="jc_config_destination_close" aria-label="Fechar">×</button>
         </div>
-        <button type="button" id="jc_config_download_as_admin" class="jc-config-admin-choice">
-          <strong>🛡️ Baixar como ADM</strong>
-          <span>Não contabiliza para cliente e não consome a CONFIG.</span>
-        </button>
-        <div class="jc-config-divider"><span>ou baixar para um cliente</span></div>
-        <input id="jc_config_client_search" type="search" autocomplete="off" placeholder="Pesquisar nome, usuário, e-mail ou WhatsApp">
-        <div id="jc_config_client_results" class="jc-config-client-results">
-          <div class="jc-config-picker-message">Digite pelo menos 2 caracteres para pesquisar.</div>
-        </div>
+        <input id="jc_config_client_search" type="search" autocomplete="off" placeholder="Buscar venda direta, nome, usuário, e-mail ou WhatsApp">
+        <div id="jc_config_client_list" class="jc-config-client-list"></div>
       </div>`;
     document.body.appendChild(modal);
 
-    const style = document.createElement("style");
-    style.id = "jc_config_destination_styles";
-    style.textContent = `
-      #jc_config_destination_picker{position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.80);backdrop-filter:blur(8px)}
-      #jc_config_destination_picker.show{display:flex}.jc-config-destination-box{width:min(680px,96vw);max-height:88vh;overflow:auto;box-sizing:border-box;padding:20px;border-radius:24px;border:1px solid rgba(67,177,255,.38);background:linear-gradient(145deg,#071522,#02070d);box-shadow:0 28px 90px rgba(0,0,0,.68);color:#fff;font-family:Arial,sans-serif}
-      .jc-config-destination-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.jc-config-destination-head h3{margin:0;font-size:23px}.jc-config-destination-head p{margin:6px 0 0;color:#9db2bd;line-height:1.45}.jc-config-destination-head>button{width:42px;height:42px;border:0;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;font-size:24px;cursor:pointer}
-      .jc-config-admin-choice{display:flex;flex-direction:column;align-items:flex-start;gap:5px;width:100%;margin-top:18px;padding:15px;border-radius:15px;border:1px solid rgba(54,225,141,.62);background:linear-gradient(135deg,rgba(18,125,74,.52),rgba(13,74,117,.46));color:#fff;text-align:left;cursor:pointer}.jc-config-admin-choice:hover{background:linear-gradient(135deg,rgba(24,159,92,.65),rgba(20,99,151,.58))}.jc-config-admin-choice strong{font-size:16px}.jc-config-admin-choice span{font-size:12px;color:#c9ffe1}
-      .jc-config-divider{display:flex;align-items:center;gap:10px;margin:17px 0 12px;color:#8297a4;font-size:12px}.jc-config-divider:before,.jc-config-divider:after{content:"";height:1px;flex:1;background:rgba(255,255,255,.12)}
-      #jc_config_client_search{width:100%;box-sizing:border-box;padding:13px 14px;border-radius:13px;border:1px solid rgba(255,255,255,.16);background:#07101b;color:#fff;font-size:15px}.jc-config-client-results{display:grid;gap:9px;margin-top:12px}.jc-config-client-option{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:13px 14px;border-radius:14px;border:1px solid rgba(62,175,255,.28);background:rgba(21,83,153,.34);color:#fff;text-align:left;cursor:pointer}.jc-config-client-option:hover{background:rgba(31,111,205,.52)}.jc-config-client-option strong,.jc-config-client-option span,.jc-config-client-option small{display:block}.jc-config-client-option strong{font-size:15px}.jc-config-client-option span{margin-top:3px;font-size:12px;color:#a9bdc9}.jc-config-client-option small{white-space:nowrap;padding:6px 8px;border-radius:9px;background:rgba(0,0,0,.25);color:#d8efff}.jc-config-picker-message{padding:18px;text-align:center;color:#9db2bd;font-size:13px}`;
-    document.head.appendChild(style);
+    if (!document.getElementById("jc_config_destination_styles")) {
+      const style = document.createElement("style");
+      style.id = "jc_config_destination_styles";
+      style.textContent = `
+        #jc_config_destination_picker{position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(0,0,0,.78);backdrop-filter:blur(8px)}
+        #jc_config_destination_picker.show{display:flex}
+        .jc-config-client-box{width:min(660px,96vw);max-height:86vh;overflow:auto;border-radius:24px;padding:20px;background:linear-gradient(145deg,#071522,#02070d);border:1px solid rgba(67,177,255,.35);box-shadow:0 28px 90px rgba(0,0,0,.65);color:#fff;font-family:Arial,sans-serif}
+        .jc-config-client-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+        .jc-config-client-head h3{margin:0;font-size:23px}
+        .jc-config-client-head p{margin:6px 0 0;color:#9db2bd;line-height:1.45}
+        .jc-config-client-head button{width:42px;height:42px;border:0;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;font-size:24px;cursor:pointer}
+        #jc_config_client_search{width:100%;box-sizing:border-box;margin:16px 0 12px;padding:13px 14px;border-radius:13px;border:1px solid rgba(255,255,255,.16);background:#07101b;color:#fff;font-size:15px}
+        .jc-config-client-list{display:grid;gap:9px}
+        .jc-config-client-option{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;padding:13px 14px;border-radius:14px;border:1px solid rgba(62,175,255,.28);background:rgba(21,83,153,.34);color:#fff;text-align:left;cursor:pointer}
+        .jc-config-client-option:hover{background:rgba(31,111,205,.5)}
+        .jc-config-client-option.jc-direct-sale{border-color:rgba(54,225,141,.62);background:linear-gradient(135deg,rgba(18,125,74,.52),rgba(13,74,117,.46));box-shadow:inset 0 0 0 1px rgba(54,225,141,.12)}
+        .jc-config-client-option.jc-direct-sale:hover{background:linear-gradient(135deg,rgba(24,159,92,.62),rgba(20,99,151,.56))}
+        .jc-config-client-option strong{font-size:15px}
+        .jc-config-client-option span,.jc-config-client-loading{font-size:12px;color:#a9bdc9}
+        .jc-config-client-option.jc-direct-sale span{color:#bfffe0}
+        .jc-config-client-loading{padding:18px;text-align:center}`;
+      document.head.appendChild(style);
+    }
 
     document.getElementById("jc_config_destination_close").onclick = () => closeDestinationPicker(null);
-    document.getElementById("jc_config_download_as_admin").onclick = () => closeDestinationPicker({
-      download_mode: "admin",
-      target_client_id: null,
-      target_name: "ADM",
-    });
     modal.onclick = (event) => { if (event.target === modal) closeDestinationPicker(null); };
-
-    const search = document.getElementById("jc_config_client_search");
-    search.addEventListener("input", () => {
-      clearTimeout(pickerTimer);
-      pickerTimer = window.setTimeout(() => searchClients(search.value), 300);
-    });
-    search.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        clearTimeout(pickerTimer);
-        searchClients(search.value);
-      }
+    document.getElementById("jc_config_client_search").addEventListener("input", (event) => {
+      renderDestinationClients(event.target.value);
     });
     return modal;
-  }
-
-  async function searchClients(term) {
-    const results = document.getElementById("jc_config_client_results");
-    const query = String(term || "").trim();
-    if (!results) return;
-    if (query.length < 2) {
-      results.innerHTML = '<div class="jc-config-picker-message">Digite pelo menos 2 caracteres para pesquisar.</div>';
-      return;
-    }
-    results.innerHTML = '<div class="jc-config-picker-message">Pesquisando clientes...</div>';
-    try {
-      const data = await invoke({ action: "admin_search_clients", search: query });
-      const clients = data.clients || [];
-      results.innerHTML = clients.length ? clients.map((client) => {
-        const usage = client.unlimited
-          ? "Sem limite"
-          : `${Number(client.used_today || 0)} de ${Number(client.effective_limit || 20)} hoje`;
-        return `<button type="button" class="jc-config-client-option" data-client-id="${escapeHtml(client.id)}" data-client-name="${escapeHtml(client.display_name || client.full_name || client.username || "Cliente")}">
-          <div><strong>${escapeHtml(client.display_name || client.full_name || client.username || "Cliente")}</strong><span>@${escapeHtml(client.username || "")} · ${escapeHtml(client.email || client.whatsapp || "")}</span></div><small>${escapeHtml(usage)}</small>
-        </button>`;
-      }).join("") : '<div class="jc-config-picker-message">Nenhum cliente ativo encontrado.</div>';
-      results.querySelectorAll("[data-client-id]").forEach((button) => {
-        button.onclick = () => closeDestinationPicker({
-          download_mode: "client",
-          target_client_id: button.dataset.clientId,
-          target_name: button.dataset.clientName || "Cliente",
-        });
-      });
-    } catch (error) {
-      results.innerHTML = `<div class="jc-config-picker-message">${escapeHtml(error?.message || "Não foi possível pesquisar.")}</div>`;
-    }
   }
 
   async function chooseDestination() {
     if (!isAdminMode()) {
       return { download_mode: "client", target_client_id: null, target_name: "Minha conta" };
     }
+
     const modal = ensureDestinationPicker();
-    document.getElementById("jc_config_client_search").value = "";
-    document.getElementById("jc_config_client_results").innerHTML = '<div class="jc-config-picker-message">Digite pelo menos 2 caracteres para pesquisar.</div>';
+    const list = document.getElementById("jc_config_client_list");
+    const search = document.getElementById("jc_config_client_search");
+    pickerClients = [];
+    search.value = "";
+    list.innerHTML = '<div class="jc-config-client-loading">Carregando clientes...</div>';
     modal.classList.add("show");
-    window.setTimeout(() => document.getElementById("jc_config_client_search")?.focus(), 80);
-    return await new Promise((resolve) => { pickerResolver = resolve; });
+    const selection = new Promise((resolve) => { pickerResolver = resolve; });
+
+    try {
+      const data = await invoke({ action: "admin_search_clients", search: "" });
+      pickerClients = Array.isArray(data.clients) ? data.clients : [];
+      if (modal.classList.contains("show")) {
+        renderDestinationClients("");
+        window.setTimeout(() => search.focus(), 80);
+      }
+    } catch (error) {
+      modal.classList.remove("show");
+      const resolver = pickerResolver;
+      pickerResolver = null;
+      if (typeof resolver === "function") resolver(null);
+      throw error;
+    }
+
+    return await selection;
   }
 
   function buttonTitle(button) {
@@ -246,20 +284,17 @@
     }
   }
 
-  function saveBlob(blob) {
-    const payload = typeof File === "function"
-      ? new File([blob], ".config", { type: "application/octet-stream", lastModified: Date.now() })
-      : new Blob([blob], { type: "application/octet-stream" });
-    const url = URL.createObjectURL(payload);
+  function startSignedDownload(signedUrl) {
+    // Não usa Blob nem o atributo download: alguns navegadores removem o ponto
+    // inicial e salvam como "config". O link assinado já vem do Supabase com
+    // Content-Disposition para entregar o nome exato ".config".
     const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", ".config");
-    link.download = ".config";
+    link.href = String(signedUrl || "");
+    link.rel = "noopener";
     link.style.display = "none";
     document.body.appendChild(link);
     link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+    window.setTimeout(() => link.remove(), 1500);
   }
 
   function report(detail) {
@@ -320,7 +355,7 @@
       if (!blob || blob.size < 1) throw new Error("O arquivo recebido está vazio.");
 
       const confirmation = await invoke({ action: "confirm", history_id: historyId });
-      saveBlob(blob);
+      startSignedDownload(reserved.signed_url);
 
       report({
         function_id: "config.access",

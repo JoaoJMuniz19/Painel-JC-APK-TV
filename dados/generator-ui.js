@@ -120,15 +120,15 @@
     openMainSection("activation");
     closePackageSubmenus("");
     closeActivationSubmenus(key);
-    const notice = $("ativador" + normalized + "_notice");
-    const count = $("ativador" + normalized + "_notice_count");
-    setActive(notice, true);
-    countdown(key, SUBMENU_SECONDS, count, "Abrindo submenu em {n} segundos...", () => {
-      const panelId = normalized === "11" ? "painel_gerador11_visual_11" : "painel_gerador11_visual";
-      const accessId = normalized === "11" ? "btn_ativador_5100_11" : "btn_ativador_5100";
-      setActive($(panelId), true);
-      setActive($(accessId), true);
-    });
+
+    // 13F: o submenu abre imediatamente. O lembrete obrigatório de 10 segundos
+    // aparece somente ao clicar em GERAR CÓDIGO REAL (11 ou 16 dígitos).
+    stopTimer(key);
+    setActive($("ativador" + normalized + "_notice"), false);
+    const panelId = normalized === "11" ? "painel_gerador11_visual_11" : "painel_gerador11_visual";
+    const accessId = normalized === "11" ? "btn_ativador_5100_11" : "btn_ativador_5100";
+    setActive($(panelId), true);
+    setActive($(accessId), true);
   }
 
   function openPackage(slug) {

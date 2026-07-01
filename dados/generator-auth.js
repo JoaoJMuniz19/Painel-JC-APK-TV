@@ -13,6 +13,8 @@
     downloadCodes: [],
     creditPending: new WeakSet(),
     creditBypass: new WeakSet(),
+    activationNoticePending: new WeakSet(),
+    activationNoticeBypass: new WeakSet(),
     activationPending: { "11": false, "16": false },
   };
   const knownFallback = [
@@ -1139,6 +1141,122 @@
       el.dataset.jcReportOperationId=operationId;state.creditBypass.add(el);setTimeout(()=>state.creditBypass.delete(el),3000);el.click();
     }catch(err){closeReservedCreditWindow(el);demoDialog({name:"Não foi possível usar os créditos"});$("jc_demo_text").textContent=err.message||"Falha ao confirmar o consumo.";}finally{state.creditPending.delete(el);}
   }
+  function activationSafetyNoticeContent(type) {
+    if (String(type) === "11") {
+      return {
+        badge: "11 DÍGITOS",
+        title: "Evite o erro EA2 — Aparelho desabilitado",
+        intro: "Antes de gerar o código, confira estas orientações importantes:",
+        items: [
+          "Use somente a versão atualizada do JC Ativador 11.",
+          "Para maior estabilidade, recomendamos formatar ou restaurar o aparelho antes da ativação.",
+          "Se preferir evitar a formatação, utilize o Ativador 16, que já possui auto limpeza integrada e normalmente dispensa formatação.",
+          "Não utilize o CH Ativador: ele não é compatível com o painel atual e pode causar erros ou bloqueio do aparelho."
+        ],
+        note: "Versões antigas e resíduos de instalações anteriores podem causar o erro EA2 — Aparelho desabilitado.",
+        actionLabel: "Entendi e gerar código 11"
+      };
+    }
+    return {
+      badge: "16 DÍGITOS",
+      title: "Evite o erro EA2 — Aparelho desabilitado",
+      intro: "Antes de gerar o código, confira estas orientações importantes:",
+      items: [
+        "Use somente a versão atualizada do JC Ativador 16.",
+        "O Ativador 16 possui auto limpeza integrada e normalmente não precisa formatar o aparelho.",
+        "Não utilize o CH Ativador: ele não é compatível com o painel atual e pode causar erros ou bloqueio do aparelho."
+      ],
+      note: "Versões antigas podem causar o erro EA2 — Aparelho desabilitado e outras falhas de compatibilidade.",
+      actionLabel: "Entendi e gerar código 16"
+    };
+  }
+  function ensureActivationSafetyNotice() {
+    let modal = $("jc_activation_safety_modal");
+    if (modal) return modal;
+    const style = document.createElement("style");
+    style.id = "jc_activation_safety_styles";
+    style.textContent = `
+      #jc_activation_safety_modal{display:none;position:fixed;inset:0;z-index:100000700;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.86);backdrop-filter:blur(9px)}
+      #jc_activation_safety_modal.show{display:flex}
+      .jc-activation-safety-box{width:min(720px,100%);max-height:94vh;overflow:auto;padding:22px;border:1px solid rgba(80,190,255,.35);border-radius:23px;background:linear-gradient(145deg,#0a2132,#06141e);color:#fff;box-shadow:0 30px 100px rgba(0,0,0,.68)}
+      .jc-activation-safety-head{display:flex;gap:12px;align-items:flex-start}.jc-activation-safety-icon{width:54px;height:54px;flex:0 0 auto;display:grid;place-items:center;border-radius:16px;background:linear-gradient(145deg,#ff9a3d,#ff3f5d);color:#fff;font-size:26px;font-weight:1000;box-shadow:0 10px 28px rgba(255,63,93,.24)}
+      .jc-activation-safety-badge{display:inline-block;margin-bottom:5px;padding:5px 8px;border-radius:999px;background:rgba(255,191,71,.12);border:1px solid rgba(255,191,71,.35);color:#ffe09b;font-size:10px;font-weight:950;letter-spacing:.13em}.jc-activation-safety-box h3{margin:0;font-size:clamp(21px,4vw,29px);line-height:1.12}
+      .jc-activation-safety-intro{margin:15px 0 10px;color:#bdd0dc;line-height:1.55}.jc-activation-safety-list{display:grid;gap:9px;margin:0;padding:0;list-style:none}.jc-activation-safety-list li{position:relative;padding:11px 12px 11px 40px;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:rgba(255,255,255,.035);line-height:1.48}.jc-activation-safety-list li:before{content:'✓';position:absolute;left:13px;top:11px;width:20px;height:20px;display:grid;place-items:center;border-radius:50%;background:#25d366;color:#052117;font-weight:1000}
+      .jc-activation-safety-note{margin-top:11px;padding:11px 12px;border-radius:13px;border:1px solid rgba(255,83,104,.38);background:rgba(255,83,104,.1);color:#ffd9df;line-height:1.48;font-weight:750}.jc-activation-safety-note b{color:#fff}
+      .jc-activation-safety-errors{display:grid;grid-template-columns:1.55fr 1fr;gap:10px;margin-top:12px}.jc-activation-safety-error-card{margin:0;overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:#07111a}.jc-activation-safety-error-card img{display:block;width:100%;height:145px;object-fit:cover;background:#000}.jc-activation-safety-error-card:first-child img{object-position:center}.jc-activation-safety-error-card figcaption{padding:8px 10px;color:#c9d8e1;font-size:11px;font-weight:800;line-height:1.35}
+      .jc-activation-safety-count{margin:13px 0 0;text-align:center;color:#ffe09b;font-size:13px;font-weight:950;letter-spacing:.04em}.jc-activation-safety-actions{display:grid;grid-template-columns:1fr 1.4fr;gap:9px;margin-top:14px}.jc-activation-safety-actions button{min-height:46px;border:0;border-radius:12px;padding:11px 13px;font-weight:950;cursor:pointer}.jc-activation-safety-cancel{background:#263b49;color:#fff}.jc-activation-safety-continue{background:#25d366;color:#052117}.jc-activation-safety-continue:disabled{opacity:.48;cursor:wait}
+      @media(max-width:620px){.jc-activation-safety-errors{grid-template-columns:1fr}.jc-activation-safety-error-card img{height:135px}.jc-activation-safety-error-card:nth-child(2){display:none}}
+      @media(max-width:520px){.jc-activation-safety-box{padding:18px}.jc-activation-safety-head{align-items:center}.jc-activation-safety-icon{width:47px;height:47px}.jc-activation-safety-actions{grid-template-columns:1fr}.jc-activation-safety-cancel{order:2}}
+    `;
+    document.head.appendChild(style);
+    modal = document.createElement("div");
+    modal.id = "jc_activation_safety_modal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = `<div class="jc-activation-safety-box" role="dialog" aria-modal="true" aria-labelledby="jc_activation_safety_title">
+      <div class="jc-activation-safety-head"><div class="jc-activation-safety-icon">⚠</div><div><span class="jc-activation-safety-badge" id="jc_activation_safety_badge"></span><h3 id="jc_activation_safety_title"></h3></div></div>
+      <p class="jc-activation-safety-intro" id="jc_activation_safety_intro"></p>
+      <ul class="jc-activation-safety-list" id="jc_activation_safety_list"></ul>
+      <div class="jc-activation-safety-note"><b>Importante:</b> <span id="jc_activation_safety_note"></span></div>
+      <div class="jc-activation-safety-errors" aria-label="Exemplos de erros de versões antigas">
+        <figure class="jc-activation-safety-error-card"><img src="../assets/erro-ea2-aparelho-desabilitado.jpg" alt="Exemplo do erro EA2 — Aparelho desabilitado" loading="lazy"><figcaption>Erro principal: EA2 — Aparelho desabilitado.</figcaption></figure>
+        <figure class="jc-activation-safety-error-card"><img src="../assets/erro-restricao-politica-localizacao.png" alt="Exemplo de erro de política ou localização" loading="lazy"><figcaption>Outro exemplo de falha causada por versão incompatível.</figcaption></figure>
+      </div>
+      <div class="jc-activation-safety-count" id="jc_activation_safety_count"></div>
+      <div class="jc-activation-safety-actions"><button type="button" class="jc-activation-safety-cancel" id="jc_activation_safety_cancel">Cancelar</button><button type="button" class="jc-activation-safety-continue" id="jc_activation_safety_continue" disabled>Aguarde 10 segundos</button></div>
+    </div>`;
+    document.body.appendChild(modal);
+    return modal;
+  }
+  function showActivationSafetyNotice(element, type) {
+    if (!element || state.activationNoticePending.has(element)) return;
+    state.activationNoticePending.add(element);
+    const modal = ensureActivationSafetyNotice();
+    const content = activationSafetyNoticeContent(type);
+    $("jc_activation_safety_badge").textContent = content.badge;
+    $("jc_activation_safety_title").textContent = content.title;
+    $("jc_activation_safety_intro").textContent = content.intro;
+    $("jc_activation_safety_note").textContent = content.note;
+    $("jc_activation_safety_list").innerHTML = content.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+    const count = $("jc_activation_safety_count");
+    const cancel = $("jc_activation_safety_cancel");
+    const proceed = $("jc_activation_safety_continue");
+    let remaining = 10;
+    let timer = null;
+    let finished = false;
+    const close = (continueGeneration) => {
+      if (finished) return;
+      finished = true;
+      if (timer) window.clearInterval(timer);
+      state.activationNoticePending.delete(element);
+      modal.classList.remove("show");
+      modal.setAttribute("aria-hidden", "true");
+      if (continueGeneration) {
+        state.activationNoticeBypass.add(element);
+        window.setTimeout(() => element.click(), 0);
+      }
+    };
+    const update = () => {
+      count.textContent = remaining > 0
+        ? `Leia o aviso. A geração será liberada em ${remaining} segundo${remaining === 1 ? "" : "s"}.`
+        : "Aviso concluído. Você já pode continuar.";
+      proceed.disabled = remaining > 0;
+      proceed.textContent = remaining > 0 ? `Aguarde ${remaining} segundo${remaining === 1 ? "" : "s"}` : content.actionLabel;
+    };
+    cancel.onclick = () => close(false);
+    proceed.onclick = () => close(true);
+    modal.onclick = (event) => { if (event.target === modal) close(false); };
+    update();
+    timer = window.setInterval(() => {
+      remaining -= 1;
+      update();
+      if (remaining <= 0 && timer) {
+        window.clearInterval(timer);
+        timer = null;
+      }
+    }, 1000);
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden", "false");
+  }
   function permissionCapture(e) {
     const el=e.target.closest("[data-jc-function-id]");if(!el)return;
     const f=(state.functions.length?state.functions:knownFallback).find((x)=>x.id===el.dataset.jcFunctionId);if(!f)return;
@@ -1188,6 +1306,21 @@
       }
       return;
     }
+
+    // 13F: aviso obrigatório de 10 segundos somente ao GERAR o código real.
+    // Ele acontece antes da escolha do cliente e, nas contas por créditos,
+    // antes de qualquer confirmação ou desconto.
+    const activationNoticeType = f.id === "activator11.generate" ? "11" : (f.id === "activator16.generate" ? "16" : "");
+    if (activationNoticeType) {
+      if (state.activationNoticeBypass.has(el)) {
+        state.activationNoticeBypass.delete(el);
+      } else {
+        e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+        showActivationSafetyNotice(el, activationNoticeType);
+        return;
+      }
+    }
+
     if(accountType()==="credits"&&f.credit_mode==="disabled"){
       e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
       demoDialog({name:f.name,purchase_enabled:false,purchase_price:0});

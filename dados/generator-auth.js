@@ -716,7 +716,31 @@
       profile: () => state.profile,
     };
   }
-  function completeGrant() {
+  async function loadClientDownloadCodes() {
+    // Correção pontual do botão “VERSÕES COD. DOWNLOAD”.
+    // Para clientes autorizados, busca a lista real em uma RPC protegida caso
+    // get_my_access não a tenha devolvido. ADM, teste e demais funções não mudam.
+    if (
+      state.mode !== "client" ||
+      !Boolean(state.permissions?.["config.download_codes"])
+    ) return;
+
+    try {
+      const { data, error } = await A.client.rpc("get_my_download_codes");
+      if (error) throw error;
+      if (Array.isArray(data)) {
+        state.downloadCodes = data;
+        if (state.access && typeof state.access === "object") {
+          state.access.download_codes = data;
+        }
+      }
+    } catch (error) {
+      // Mantém o acesso funcionando mesmo antes de o SQL ser executado.
+      console.warn("Versões/códigos de download:", error?.message || error);
+    }
+  }
+  async function completeGrant() {
+    await loadClientDownloadCodes();
     store();
     installServerActivationGenerators();
     applyPermissions();

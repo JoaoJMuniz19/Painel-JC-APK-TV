@@ -1183,9 +1183,7 @@
       .jc-activation-safety-badge{display:inline-block;margin-bottom:5px;padding:5px 8px;border-radius:999px;background:rgba(255,191,71,.12);border:1px solid rgba(255,191,71,.35);color:#ffe09b;font-size:10px;font-weight:950;letter-spacing:.13em}.jc-activation-safety-box h3{margin:0;font-size:clamp(21px,4vw,29px);line-height:1.12}
       .jc-activation-safety-intro{margin:15px 0 10px;color:#bdd0dc;line-height:1.55}.jc-activation-safety-list{display:grid;gap:9px;margin:0;padding:0;list-style:none}.jc-activation-safety-list li{position:relative;padding:11px 12px 11px 40px;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:rgba(255,255,255,.035);line-height:1.48}.jc-activation-safety-list li:before{content:'✓';position:absolute;left:13px;top:11px;width:20px;height:20px;display:grid;place-items:center;border-radius:50%;background:#25d366;color:#052117;font-weight:1000}
       .jc-activation-safety-note{margin-top:11px;padding:11px 12px;border-radius:13px;border:1px solid rgba(255,83,104,.38);background:rgba(255,83,104,.1);color:#ffd9df;line-height:1.48;font-weight:750}.jc-activation-safety-note b{color:#fff}
-      .jc-activation-safety-errors{display:grid;grid-template-columns:1.55fr 1fr;gap:10px;margin-top:12px}.jc-activation-safety-error-card{margin:0;overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:#07111a}.jc-activation-safety-error-card img{display:block;width:100%;height:145px;object-fit:cover;background:#000}.jc-activation-safety-error-card:first-child img{object-position:center}.jc-activation-safety-error-card figcaption{padding:8px 10px;color:#c9d8e1;font-size:11px;font-weight:800;line-height:1.35}
       .jc-activation-safety-count{margin:13px 0 0;text-align:center;color:#ffe09b;font-size:13px;font-weight:950;letter-spacing:.04em}.jc-activation-safety-actions{display:grid;grid-template-columns:1fr 1.4fr;gap:9px;margin-top:14px}.jc-activation-safety-actions button{min-height:46px;border:0;border-radius:12px;padding:11px 13px;font-weight:950;cursor:pointer}.jc-activation-safety-cancel{background:#263b49;color:#fff}.jc-activation-safety-continue{background:#25d366;color:#052117}.jc-activation-safety-continue:disabled{opacity:.48;cursor:wait}
-      @media(max-width:620px){.jc-activation-safety-errors{grid-template-columns:1fr}.jc-activation-safety-error-card img{height:135px}.jc-activation-safety-error-card:nth-child(2){display:none}}
       @media(max-width:520px){.jc-activation-safety-box{padding:18px}.jc-activation-safety-head{align-items:center}.jc-activation-safety-icon{width:47px;height:47px}.jc-activation-safety-actions{grid-template-columns:1fr}.jc-activation-safety-cancel{order:2}}
     `;
     document.head.appendChild(style);
@@ -1197,10 +1195,6 @@
       <p class="jc-activation-safety-intro" id="jc_activation_safety_intro"></p>
       <ul class="jc-activation-safety-list" id="jc_activation_safety_list"></ul>
       <div class="jc-activation-safety-note"><b>Importante:</b> <span id="jc_activation_safety_note"></span></div>
-      <div class="jc-activation-safety-errors" aria-label="Exemplos de erros de versões antigas">
-        <figure class="jc-activation-safety-error-card"><img src="../assets/erro-ea2-aparelho-desabilitado.jpg" alt="Exemplo do erro EA2 — Aparelho desabilitado" loading="lazy"><figcaption>Erro principal: EA2 — Aparelho desabilitado.</figcaption></figure>
-        <figure class="jc-activation-safety-error-card"><img src="../assets/erro-restricao-politica-localizacao.png" alt="Exemplo de erro de política ou localização" loading="lazy"><figcaption>Outro exemplo de falha causada por versão incompatível.</figcaption></figure>
-      </div>
       <div class="jc-activation-safety-count" id="jc_activation_safety_count"></div>
       <div class="jc-activation-safety-actions"><button type="button" class="jc-activation-safety-cancel" id="jc_activation_safety_cancel">Cancelar</button><button type="button" class="jc-activation-safety-continue" id="jc_activation_safety_continue" disabled>Aguarde 10 segundos</button></div>
     </div>`;

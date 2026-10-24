@@ -1032,6 +1032,39 @@
     const content=notice.querySelector('[data-jc-maintenance-message]');
     if(content)content.textContent=String(status?.message||'Acesso temporariamente suspenso para regularização das parcerias. Entre em contato com a administração.');
   }
+  // Proteção adicional: aplica a manutenção também a sessões restauradas e abertas.
+  let maintenanceChecking=false;
+  function maintenanceBlockedScreen(message){
+    let cover=document.getElementById('jc-maintenance-access-block');
+    if(!cover){
+      cover=document.createElement('div');
+      cover.id='jc-maintenance-access-block';
+      cover.setAttribute('role','alertdialog');
+      cover.setAttribute('aria-modal','true');
+      cover.style.cssText='position:fixed;inset:0;z-index:2147483647;background:#091018;color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Arial,sans-serif;text-align:center';
+      cover.innerHTML='<div style="max-width:480px;padding:32px;border:1px solid #c89539;border-radius:18px;background:#171d25"><h1 style="font-size:25px;margin:0 0 16px">Painel em manutenção</h1><p id="jc-maintenance-block-message" style="line-height:1.6"></p></div>';
+      document.body.appendChild(cover);
+    }
+    cover.querySelector('#jc-maintenance-block-message').textContent=message||'Acesso temporariamente suspenso. Entre em contato com a administração.';
+  }
+  async function enforceMaintenance(mode){
+    const status=await globalMaintenanceStatus();
+    renderGlobalMaintenance(status);
+    if(status.enabled===true && mode!=='admin'){
+      maintenanceBlockedScreen(String(status.message||'Acesso temporariamente suspenso. Entre em contato com a administração.'));
+      try{await A.client.auth.signOut();}catch(e){console.warn('Saída durante manutenção:',e);}
+      return false;
+    }
+    return true;
+  }
+  async function checkOpenSessionMaintenance(){
+    if(maintenanceChecking || !state.mode || state.mode==='admin')return;
+    maintenanceChecking=true;
+    try{await enforceMaintenance(state.mode);}catch(e){
+      // Falha de verificação: impede continuar operando sem validar o estado.
+      maintenanceBlockedScreen('Não foi possível verificar o acesso. Atualize a página e tente novamente.');
+    }finally{maintenanceChecking=false;}
+  }
   async function validate() {
     const user = $("login_user")?.value.trim() || "",
       pass = $("login_pass")?.value || "";
@@ -1916,6 +1949,7 @@
       return;
     }
     if (preview) {
+      try{if(!await enforceMaintenance('preview'))return;}catch(e){maintenanceBlockedScreen('Não foi possível verificar o estado de manutenção.');return;}
       state.passwordChangeRequired=false;
       msg("ABRINDO PRÉ-TESTE...", true);
       grant(preview?.profile?.account_type === "test" || preview?.profile?.role === "test" ? "test" : "preview", preview);
@@ -1924,7 +1958,7 @@
     if (!A.ready) return;
     const trialToken=new URLSearchParams(location.search).get("teste");
     if(trialToken){
-      try{const {data,error}=await A.client.rpc("get_trial_access",{p_token:trialToken});if(error)throw error;if(!data?.profile)throw new Error("Este link de teste expirou ou não é válido.");msg("ABRINDO TESTE TEMPORÁRIO...",true);grant("test",data);return;}catch(e){msg(e.message||"Link de teste inválido.");return;}
+      try{if(!await enforceMaintenance('test'))return;const {data,error}=await A.client.rpc("get_trial_access",{p_token:trialToken});if(error)throw error;if(!data?.profile)throw new Error("Este link de teste expirou ou não é válido.");msg("ABRINDO TESTE TEMPORÁRIO...",true);grant("test",data);return;}catch(e){msg(e.message||"Link de teste inválido.");return;}
     }
     const { data: { session } } = await A.client.auth.getSession();
     if (!session) return;
@@ -1933,6 +1967,7 @@
       if(access?.profile)await loadBillingSettings(access);
       if (access?.profile && !expired(access.profile)) {
         const mode=access.profile.role === "admin" ? "admin" : access.profile.role === "test" ? "test" : "client";
+        if(!await enforceMaintenance(mode))return;
         state.passwordChangeRequired=await readPasswordChangeRequired(mode,access);
         msg("RESTAURANDO ACESSO...", true);
         grant(mode, access);
@@ -1942,5 +1977,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     injectStyles();
     restore();
+    setInterval(checkOpenSessionMaintenance,15000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkOpenSessionMaintenance();});
   });
 })();

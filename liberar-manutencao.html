@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Manutenção do painel | JC-APK TV</title>
+<style>
+:root{--bg:#0b1322;--card:#121d31;--line:#243350;--text:#e8eef9;--muted:#8fa0bd;--accent:#4a9eff;--ok:#3ecf8e;--warn:#f0b34a;--bad:#ff6b6b;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px;padding-top:max(16px,env(safe-area-inset-top));padding-bottom:max(32px,env(safe-area-inset-bottom))}
+main{max-width:640px;margin:0 auto;display:grid;gap:16px}
+h1{font-size:1.5rem;line-height:1.2;margin:8px 0 0}
+h2{font-size:1.1rem;margin:0}
+p{margin:0}
+.muted{color:var(--muted);font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:12px}
+[hidden]{display:none!important}
+label.f{display:grid;gap:4px;font-size:.9rem;color:var(--muted)}
+input[type=email],input[type=password],input[type=search]{width:100%;background:#0d1729;border:1px solid var(--line);border-radius:10px;color:var(--text);padding:12px;font:inherit}
+input:focus-visible,button:focus-visible,.sw input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+button{font:inherit;font-weight:600;border:0;border-radius:12px;padding:12px 16px;cursor:pointer;background:var(--accent);color:#04101f}
+button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:500}
+button.danger{background:var(--warn)}
+button:disabled{opacity:.55;cursor:wait}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.chip{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.85rem;font-weight:600;border:1px solid currentColor}
+.chip.on{color:var(--warn)}.chip.off{color:var(--ok)}
+ul{list-style:none;margin:0;padding:0;display:grid}
+li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+li:first-child{border-top:0}
+li .n{min-width:0}
+li .n b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sw{position:relative;display:inline-flex;align-items:center;gap:8px;flex:none;font-size:.85rem;color:var(--muted)}
+.sw input{position:absolute;opacity:0;width:44px;height:26px;margin:0;cursor:pointer}
+.sw span{width:44px;height:26px;border-radius:99px;background:#2a3a58;position:relative;transition:background .15s}
+.sw span::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .15s}
+.sw input:checked+span{background:var(--ok)}
+.sw input:checked+span::after{transform:translateX(18px)}
+.sw input:disabled+span{opacity:.5}
+#toast{position:fixed;left:16px;right:16px;bottom:max(16px,env(safe-area-inset-bottom));max-width:608px;margin:0 auto;background:#1b2a47;border:1px solid var(--line);border-radius:12px;padding:12px 16px;font-size:.95rem}
+#toast.bad{border-color:var(--bad)}
+@media (prefers-reduced-motion:reduce){.sw span,.sw span::after{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Manutenção do painel</h1>
+    <p class="muted">Quem estiver liberado continua usando o painel enquanto a manutenção estiver ligada.</p>
+  </header>
+
+  <section class="card" id="login" hidden>
+    <h2>Entrar como administrador</h2>
+    <form id="loginForm" class="card" style="padding:0;border:0;background:none">
+      <label class="f">E-mail<input id="email" type="email" autocomplete="username" required></label>
+      <label class="f">Senha<input id="pass" type="password" autocomplete="current-password" required></label>
+      <button id="loginBtn" type="submit">Entrar</button>
+    </form>
+  </section>
+
+  <div id="app" hidden style="display:grid;gap:16px">
+    <section class="card">
+      <div class="row">
+        <h2>Estado da manutenção</h2>
+        <span class="chip off" id="chip">Carregando</span>
+      </div>
+      <p class="muted" id="statusMsg"></p>
+      <button id="toggleBtn" type="button" disabled>Aguarde</button>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <h2>Clientes liberados</h2>
+        <span class="muted" id="count"></span>
+      </div>
+      <input id="q" type="search" placeholder="Buscar por nome, usuário ou e-mail" aria-label="Buscar cliente">
+      <ul id="list"></ul>
+      <p class="muted" id="empty" hidden>Nenhum cliente encontrado.</p>
+    </section>
+
+    <button class="ghost" id="logout" type="button">Sair</button>
+  </div>
+</main>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+<script>
+const SB_URL = "https://iwavyzzdrhbwmjjjxehr.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3YXZ5enpkcmhid21qamp4ZWhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2NDQyMTIsImV4cCI6MjA5NzIyMDIxMn0.qy-iSjT2tVV1E5qyMEOiOwef8Vowe1lGL2UckYjaNm4";
+const sb = window.supabase.createClient(SB_URL, SB_KEY);
+const $ = (id) => document.getElementById(id);
+let enabled = false, timer, toastTimer;
+
+function toast(msg, bad) {
+  const t = $("toast");
+  t.textContent = msg; t.className = bad ? "bad" : ""; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 4500);
+}
+function show(logged) { $("login").hidden = logged; $("app").hidden = !logged; }
+
+async function loadStatus() {
+  const { data, error } = await sb.rpc("jc_public_maintenance_status");
+  if (error) { toast("Não foi possível ler o estado: " + error.message, true); return; }
+  enabled = !!data.enabled;
+  $("chip").textContent = enabled ? "Ligada" : "Desligada";
+  $("chip").className = "chip " + (enabled ? "on" : "off");
+  $("statusMsg").textContent = enabled
+    ? "Clientes sem liberação não conseguem usar o painel."
+    : "O painel está funcionando para todos.";
+  const b = $("toggleBtn");
+  b.textContent = enabled ? "Desligar manutenção" : "Ligar manutenção";
+  b.className = enabled ? "" : "danger";
+  b.disabled = false;
+}
+
+async function loadClients() {
+  const { data, error } = await sb.rpc("jc_admin_list_maintenance_clients", { p_search: $("q").value.trim() });
+  if (error) {
+    toast(error.message, true);
+    if (/administrador/i.test(error.message)) { await sb.auth.signOut(); show(false); }
+    return;
+  }
+  const ul = $("list"); ul.textContent = "";
+  $("empty").hidden = data.length > 0;
+  $("count").textContent = data.filter(c => c.maintenance_bypass).length + " liberados";
+  data.forEach((c) => {
+    const li = document.createElement("li");
+    const n = document.createElement("div"); n.className = "n";
+    const b = document.createElement("b"); b.textContent = c.full_name || c.username;
+    const s = document.createElement("span"); s.className = "muted";
+    s.textContent = "@" + c.username + (c.status !== "active" ? " (" + c.status + ")" : "");
+    n.append(b, s);
+    const lab = document.createElement("label"); lab.className = "sw";
+    const inp = document.createElement("input"); inp.type = "checkbox"; inp.setAttribute("role", "switch");
+    inp.checked = !!c.maintenance_bypass; inp.setAttribute("aria-label", "Liberar " + (c.full_name || c.username));
+    const knob = document.createElement("span");
+    const txt = document.createElement("small"); txt.textContent = inp.checked ? "Liberado" : "Bloqueado";
+    inp.addEventListener("change", async () => {
+      const want = inp.checked; inp.disabled = true;
+      const { error: e } = await sb.rpc("jc_admin_set_maintenance_bypass", { p_user_id: c.id, p_enabled: want });
+      inp.disabled = false;
+      if (e) { inp.checked = !want; toast(e.message, true); return; }
+      txt.textContent = want ? "Liberado" : "Bloqueado";
+      c.maintenance_bypass = want;
+      $("count").textContent = Array.from(ul.querySelectorAll("input")).filter(i => i.checked).length + " liberados";
+      toast((c.full_name || c.username) + (want ? " liberado." : " bloqueado."));
+    });
+    lab.append(inp, knob, txt);
+    li.append(n, lab); ul.append(li);
+  });
+}
+
+$("toggleBtn").addEventListener("click", async () => {
+  const turnOn = !enabled;
+  if (turnOn && !confirm("Ligar a manutenção agora? Todos os clientes sem liberação perdem o acesso ao painel.")) return;
+  const b = $("toggleBtn"); b.disabled = true;
+  const { error } = await sb.rpc("jc_admin_set_maintenance", { p_enabled: turnOn });
+  if (error) { toast(error.message, true); b.disabled = false; return; }
+  await loadStatus();
+  toast(turnOn ? "Manutenção ligada." : "Manutenção desligada.");
+});
+$("q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(loadClients, 300); });
+$("logout").addEventListener("click", async () => { await sb.auth.signOut(); show(false); });
+$("loginForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const btn = $("loginBtn"); btn.disabled = true;
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("pass").value });
+  btn.disabled = false;
+  if (error) { toast("E-mail ou senha incorretos.", true); return; }
+  $("pass").value = ""; start();
+});
+
+async function start() { show(true); await Promise.all([loadStatus(), loadClients()]); }
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data.session) start(); else show(false);
+})();
+</script>
+</body>
+</html>

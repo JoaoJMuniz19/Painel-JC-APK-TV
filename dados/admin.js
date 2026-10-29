@@ -1613,7 +1613,11 @@
     state.formDirty = false;
     state.previewToken = "";
     setTestState("checking", "Executando todas as verificações...", checks);
-    const expected = expectedPermissions();
+    // Só compara funções ativas no catálogo: o acesso técnico (admin_get_client_access)
+    // devolve apenas funções com active = true, então funções inativas nunca voltam
+    // e geravam o falso erro "Permissões diferentes do cadastro".
+    const activeFunctionIds = new Set((state.functions || []).map((f) => f.id));
+    const expected = new Set([...expectedPermissions()].filter((id) => activeFunctionIds.has(id)));
     try {
       const baseUrl = new URL("geradores/index.html?access-test=" + Date.now(), location.href);
       const response = await fetch(baseUrl.href, { cache: "no-store" });
